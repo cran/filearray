@@ -1,29 +1,12 @@
-#include "common.h"
+#include "serialize.h"
+#include "conversion.h"
+#include "core.h"
 using namespace Rcpp;
 
-// [[Rcpp::export]]
-SEXP check_missing_dots(const SEXP env){
-    if( TYPEOF(env) != ENVSXP ){
-        Rcpp::stop("`check_missing_dots` is asking for an environment");
-    }
-    SEXP dots = Rf_findVarInFrame(env, R_DotsSymbol);
-    
-    std::vector<bool> is_missing(0);
-    
-    if( dots != R_NilValue ){
-        SEXP el = R_NilValue;
-        
-        for(; (dots != R_NilValue) && (dots != R_MissingArg); dots = CDR(dots) ){
-            el = CAR(dots);
-            if( el == R_MissingArg ){
-                is_missing.push_back(true);
-            } else {
-                is_missing.push_back(false);
-            }
-        }
-    }
-    
-    return(Rcpp::wrap(is_missing));
+static int nbuffers = 65536;
+
+int system_buffer_size(){
+    return(BUFSIZ);
 }
 
 // [[Rcpp::export]]
@@ -53,87 +36,178 @@ int get_buffer_size(){
     return nbuffers;
 }
 
-// [[Rcpp::export]]
-int kinda_sorted(SEXP idx, int64_t min_, int64_t buffer_count){
-    int64_t* ptr = (int64_t*) REAL(idx);
-    int64_t lb = min_;
-    
-    // int64_t buffer_count = nbuffers / elem_size;
-    int64_t ub = lb + buffer_count;
-    for(R_xlen_t ii = 0; ii < Rf_xlength(idx); ii++, ptr++){
-        if( *ptr == NA_INTEGER64 ){ continue; }
-        
-        if( lb == NA_INTEGER64 ){
-            lb = *ptr;
-            ub = lb + buffer_count;
-        }
-        
-        if(*ptr < lb){
-            return(0);
-        }
-        if(*ptr >= ub){
-            while(*ptr >= ub){
-                lb = ub;
-                ub = lb + buffer_count;
-            }
-        }
+
+
+std::string correct_filebase(const std::string& filebase){
+#ifdef Win32
+    std::string filesep = "\\";
+#else
+    std::string filesep = "/";
+#endif
+    if(filebase.compare(filebase.length() - 1, 1, filesep) != 0){
+        return( filebase + filesep );
+    } else {
+        return( filebase );
     }
-    return(1);
-}
-
-bool isLittleEndian(){
-    int x = 1;
-    bool is_little = *((char*)&x) == 1;
-    return ( is_little );
-    // DEBUG test big endianess
-    // return(!is_little);
-}
-
-double prod_double(const NumericVector& x){
-    if(x.length() == 0){ return(0.0); }
-    double re = 1.0;
-    re = std::accumulate(x.begin(), x.end(), re, std::multiplies<double>());
-    return(re);
 }
 
 // [[Rcpp::export]]
-SEXP realToUint64(NumericVector x, const double min_, const double max_, const int strict){
-    R_xlen_t len = x.length();
-    SEXP re = PROTECT(Rf_allocVector(REALSXP, len));
-    Rf_setAttrib(re, R_ClassSymbol, wrap("integer64"));
+List FARR_meta(const std::string& filebase) {
+    // read information from meta
+    std::string meta = correct_filebase(filebase) + "meta";
     
-    int64_t *reptr = (int64_t *) REAL(re);
+    FILE* conn = fopen(meta.c_str(), "rb");
     
-    NumericVector::iterator xptr = x.begin();
-    
-    for(; xptr != x.end(); xptr++, reptr++ ){
-        if( ISNAN(*xptr) ){
-            *reptr = NA_INTEGER64;
-            continue;
-        }
-        if( *xptr < min_ || *xptr > max_ ){
-            if( strict ){
-                stop("Index out of margin bound");
-            }
-            *reptr = NA_INTEGER64;
-            continue;
-        }
-        *reptr = (int64_t) *xptr;
+    if( conn == NULL ){
+        stop("`FileArray`: cannot find meta information. Make sure `filebase` is a directory containing 'meta' file.");
     }
     
-    UNPROTECT(1);
+    void* buf = malloc(FARR_HEADER_LENGTH);
+    if(buf == NULL) {
+        fclose(conn);
+        conn = NULL;
+        free(buf);
+        buf = NULL;
+        stop("Cannot allocate 1KB of memory to read meta file");
+    }
+    
+    int nread = fread(buf, 1, FARR_HEADER_LENGTH, conn);
+    if( nread < FARR_HEADER_LENGTH ){
+        fclose(conn);
+        conn = NULL;
+        free(buf);
+        buf = NULL;
+        stop("Invalid header length");
+    }
+    
+    bool swap_endian = !isLittleEndian();
+    
+    char* buf2 = (char*) buf;
+    double content_len = 0.0;
+    memcpy(&(content_len), buf2 + (FARR_HEADER_LENGTH - 8), 8);
+    if( swap_endian ){ swap_endianess(&(content_len), 8, 1); }
+    size_t content_len2 = (size_t) content_len;
+    
+    SEXP dimnames = R_NilValue;
+    if( content_len2 > 0 ){
+        PROTECT(dimnames = unserialize_connection(conn, content_len2));
+    }
+    fclose(conn);
+    conn = NULL;
+    
+    SEXP file_version = PROTECT(Rf_allocVector(INTSXP, 3)); 
+    memcpy(INTEGER(file_version), buf2 + 8, 3 * 4); // 20
+    if( swap_endian ){ swap_endianess(INTEGER(file_version), 4, 3); }
+    
+    int sexp_type = 0;
+    memcpy(&sexp_type, buf2 + 20, 4); // 24
+    if( swap_endian ){ swap_endianess(&sexp_type, 4, 1); }
+    
+    int elem_size = 0;
+    memcpy(&elem_size, buf2 + 24, 4); // 28
+    if( swap_endian ){ swap_endianess(&elem_size, 4, 1); }
+    
+    double partition_size = 0.0;
+    memcpy(&partition_size, buf2 + 28, 8); // 36
+    if( swap_endian ){ swap_endianess(&partition_size, 8, 1); }
+    
+    double total_len = 0.0;
+    memcpy(&total_len, buf2 + 36, 8); // 44
+    if( swap_endian ){ swap_endianess(&total_len, 8, 1); }
+    
+    int ndims = 0;
+    memcpy(&ndims, buf2 + 44, 4); // 48
+    if( swap_endian ){ swap_endianess(&ndims, 4, 1); }
+    
+    SEXP dimension = PROTECT(Rf_allocVector(REALSXP, ndims));
+    memcpy(REAL(dimension), buf2 + 48, ndims * 8);
+    if( swap_endian ){ swap_endianess(REAL(dimension), 8, ndims); }
+    
+    free(buf);
+    buf = NULL;
+    buf2 = NULL;
+    
+    double last_margin = *(REAL(dimension) + (ndims - 1));
+    double nparts = std::ceil(last_margin / partition_size);
+    SEXP cum_part_size = PROTECT(Rf_allocVector(REALSXP, (uint64_t) nparts));
+    double tmp = 0;
+    for( R_xlen_t part = 0; part < Rf_xlength(cum_part_size); part++ ){
+        tmp += partition_size;
+        if( tmp > last_margin ){
+            tmp = last_margin;
+        }
+        if( tmp <= last_margin ){
+            *(REAL(cum_part_size) + part) = tmp;
+        }
+    }
+    
+    // R_gc();
+    
+    List re = List::create(
+        _["file_version"] = file_version,
+        _["dimension"] = dimension,
+        _["sexp_type"] = sexp_type,
+        _["elem_size"] = elem_size,
+        _["partition_size"] = partition_size,
+        _["length"] = total_len,
+        _["cumsum_part_sizes"] = cum_part_size,
+        _["dimnames"] = dimnames
+    );
+    UNPROTECT(3 + (content_len2 > 0));
+    
     return re;
+    
 }
 
-SEXP seq_len_int64(const R_xlen_t len){
-    SEXP tmp = PROTECT(Rf_allocVector(REALSXP, len));
-    Rf_setAttrib(tmp, R_ClassSymbol, wrap("integer64"));
-    int64_t* tmpptr = (int64_t*) REAL(tmp);
-    for(R_xlen_t ii = 1; ii <= len; ii++, tmpptr++){
-        *tmpptr = ii;
+// [[Rcpp::export]]
+SEXP loc2idx(const List sliceIdx, const NumericVector& dim){
+    // sliceIdx[[i]] REALSEXP but stored with long long
+    // List sliceIdx = locationList(listOrEnv, dim, 1);
+    
+    R_xlen_t exp_len = 1;
+    R_xlen_t idx = 0;
+    
+    if( dim.size() == 0 ){
+        exp_len = 0;
     }
+    
+    for( ; idx < sliceIdx.length(); idx++ ){
+        SEXP tmp = sliceIdx[idx];
+        exp_len *= Rf_xlength(tmp);
+    }
+    
+    SEXP re = PROTECT( Rf_allocVector(REALSXP, exp_len) );
+    
+    Rf_setAttrib(re, R_ClassSymbol, Shield<SEXP>(wrap("integer64")));
+    if( exp_len == 0 ){
+        UNPROTECT(1);
+        return( re );
+    }
+    
+    // initialize
+    int64_t* reptr_const = (int64_t*) REAL(re);
+    int64_t* reptr = reptr_const;
+    R_xlen_t ii = 0;
+    for(; ii < exp_len; ii++, reptr++){
+        *reptr = 0;
+    }
+    
+    reptr = reptr_const;
+    
+    R_xlen_t step = 1;
+    R_xlen_t mag = 1;
+    // addCycle(SEXP x, SEXP ret, const R_xlen_t step = 1)
+    SEXP el;
+    
+    for( idx = 0; idx < sliceIdx.length(); idx++ ){
+        el = sliceIdx[idx];
+        addCycle(el, re, step, mag);
+        step *= Rf_xlength(el);
+        mag *= dim[idx];
+    }
+    
     UNPROTECT(1);
-    return tmp;
+    return( re );
 }
 
 // [[Rcpp::export]]
@@ -157,10 +231,15 @@ SEXP locationList(const SEXP listOrEnv, const NumericVector& dim, const int stri
         }
         break;
     }
-    case VECSXP:
+    case VECSXP: {
+        if( Rf_getAttrib(listOrEnv, Rf_install("_asis_")) == R_NilValue ){
         sliceIdx = listOrEnv;
         idx_size = Rf_xlength(sliceIdx);
-        break;
+    } else {
+        return( listOrEnv );
+    }
+    break;
+    }
     default:
         Rcpp::stop("Input `listOrEnv` must be either a list of indices or an environment");
     }
@@ -188,7 +267,7 @@ SEXP locationList(const SEXP listOrEnv, const NumericVector& dim, const int stri
                     el = PROTECT(Rf_allocVector(REALSXP, 0));
                     n_protected++;
                 } else {
-                    el = PROTECT(realToUint64(as<NumericVector>(el), 1, dl, strict));
+                    el = PROTECT(realToInt64(as<NumericVector>(el), 1, dl, strict));
                     n_protected++;
                 }
                 SET_VECTOR_ELT(sliceIdx, idx_size, el);
@@ -197,7 +276,7 @@ SEXP locationList(const SEXP listOrEnv, const NumericVector& dim, const int stri
                     el = PROTECT(seq_len_int64( dl ));
                     n_protected++;
                 } else {
-                    el = PROTECT(realToUint64(as<NumericVector>(el), 1, dl, strict));
+                    el = PROTECT(realToInt64(as<NumericVector>(el), 1, dl, strict));
                     n_protected++;
                 }
                 SET_VECTOR_ELT(sliceIdx, idx_size, el);
@@ -212,146 +291,12 @@ SEXP locationList(const SEXP listOrEnv, const NumericVector& dim, const int stri
             n_protected++;
         }
     }
-    
+    Rf_setAttrib(sliceIdx, Rf_install("_asis_"), Shield<SEXP>(wrap(true)));
     
     UNPROTECT(n_protected); // sliceIdx
     
     return( sliceIdx );
 }
-
-SEXP dropDimension(SEXP x){
-    SEXP dim = Rf_getAttrib(x, R_DimSymbol);
-    if(dim == R_NilValue){
-        return x;
-    }
-    SEXP new_dim;
-    R_xlen_t ndims = Rf_xlength(dim);
-    R_xlen_t xlen = Rf_xlength(x);
-    if(ndims == 0){
-        new_dim = R_NilValue;
-        Rf_setAttrib(x, R_DimSymbol, new_dim);
-        return x;
-    }
-    if(xlen == 0){
-        return x;
-    }
-    
-    R_xlen_t ii;
-    
-    new_dim = PROTECT(Rf_allocVector(TYPEOF(dim), ndims));
-    
-    switch(TYPEOF(dim)){
-    case INTSXP: {
-        int *ptr_orig = INTEGER(dim);
-        int *ptr_new = INTEGER(new_dim);
-        for(ii = 0; ptr_orig != INTEGER(dim) + ndims; ptr_orig++ ){
-            if(*ptr_orig > 1){
-                *ptr_new++ = *ptr_orig;
-                ii++;
-            }
-        }
-        break;
-    }
-    case REALSXP: {
-        double *ptr_orig = REAL(dim);
-        double *ptr_new = REAL(new_dim);
-        for(ii = 0; ptr_orig != REAL(dim) + ndims; ptr_orig++ ){
-            if(*ptr_orig > 1){
-                *ptr_new++ = *ptr_orig;
-                ii++;
-            }
-        }
-        break;
-    }
-    default:
-        stop("unknown dimension storage type");
-    }
-    if(ii == ndims){} else if(ii >= 2){
-        SETLENGTH(new_dim, ii);
-        
-        Rf_setAttrib(x, R_DimSymbol, new_dim);
-    } else {
-        Rf_setAttrib(x, R_DimSymbol, R_NilValue);
-    }
-    
-    UNPROTECT(1);
-    return x;
-}
-
-int64_t prod2(SEXP x, bool na_rm){
-    SEXP x_alt = x;
-    
-    int n_protected = 0;
-    
-    if(TYPEOF(x_alt) != REALSXP){
-        x_alt = PROTECT(Rf_coerceVector(x_alt, REALSXP));
-        n_protected++;
-    }
-    int64_t res = 1;
-    R_xlen_t xlen = Rf_xlength(x) - 1;
-    for(; xlen >= 0; xlen-- ){
-        int64_t tmp = REAL(x_alt)[xlen];
-        if(tmp == NA_REAL || tmp == NA_INTEGER64){
-            if(!na_rm){
-                res = NA_INTEGER64;
-                break;
-            }
-        } else {
-            res *= REAL(x_alt)[xlen];
-        }
-    }
-    
-    if( n_protected > 0 ){
-        UNPROTECT(n_protected);
-    }
-    
-    return res;
-}
-
-// [[Rcpp::export]]
-SEXP reshape_or_drop(SEXP x, SEXP reshape, bool drop){
-    // SEXP reshape, bool drop = false
-    // if reshape is not null, drop is ignored
-    if(reshape == R_NilValue && !drop){
-        return x;
-    }
-    
-    if(reshape == R_NilValue && drop){
-        dropDimension(x);
-        return x;
-    }
-    
-    // reshape has length, hence need to check dimension length
-    
-    // subset_mode=0 => x[i,j,k]
-    // subset_mode=1 => x[i]
-    // subset_mode=2 => x[]
-    SEXP reshape_alt = reshape;
-    int n_protected = 0;
-    if(TYPEOF(reshape) != REALSXP){
-        reshape_alt = PROTECT(Rf_coerceVector(reshape_alt, REALSXP));
-        n_protected++;
-    }
-    const int64_t reshape_length = prod2(reshape_alt, false);
-    const int64_t expected_length = Rf_xlength(x);
-    
-    if(reshape_length == NA_INTEGER64 || reshape_length != expected_length){
-        warning("`reshape` has different length than expected. Request to reshape dimension is ignored.");
-    } else {
-        if(Rf_xlength(reshape_alt) >= 2){
-            Rf_setAttrib(x, R_DimSymbol, reshape_alt);
-        } else {
-            Rf_setAttrib(x, R_DimSymbol, R_NilValue);
-        }
-    }
-    
-    if(n_protected > 0){
-        UNPROTECT(n_protected);
-    }
-    
-    return x;
-}
-
 
 SEXP addCycle(SEXP x, SEXP ret, const R_xlen_t step, const R_xlen_t mag){
     int64_t* retptr = (int64_t*) REAL(ret);
@@ -394,55 +339,6 @@ SEXP addCycle(SEXP x, SEXP ret, const R_xlen_t step, const R_xlen_t mag){
     return( ret );
 }
 
-// [[Rcpp::export]]
-SEXP loc2idx(const List sliceIdx, const NumericVector& dim){
-    // sliceIdx[[i]] REALSEXP but stored with long long
-    // List sliceIdx = locationList(listOrEnv, dim, 1);
-    
-    R_xlen_t exp_len = 1;
-    R_xlen_t idx = 0;
-    
-    if( dim.size() == 0 ){
-        exp_len = 0;
-    }
-    
-    for( ; idx < sliceIdx.length(); idx++ ){
-        SEXP tmp = sliceIdx[idx];
-        exp_len *= Rf_xlength(tmp);
-    }
-    
-    SEXP re = PROTECT( Rf_allocVector(REALSXP, exp_len) );
-    Rf_setAttrib(re, R_ClassSymbol, wrap("integer64"));
-    if( exp_len == 0 ){
-        UNPROTECT(1);
-        return( re );
-    }
-    
-    // initialize
-    int64_t* reptr_const = (int64_t*) REAL(re);
-    int64_t* reptr = reptr_const;
-    R_xlen_t ii = 0;
-    for(; ii < exp_len; ii++, reptr++){
-        *reptr = 0;
-    }
-    
-    reptr = reptr_const;
-    
-    R_xlen_t step = 1;
-    R_xlen_t mag = 1;
-    // addCycle(SEXP x, SEXP ret, const R_xlen_t step = 1)
-    SEXP el;
-    
-    for( idx = 0; idx < sliceIdx.length(); idx++ ){
-        el = sliceIdx[idx];
-        addCycle(el, re, step, mag);
-        step *= Rf_xlength(el);
-        mag *= dim[idx];
-    }
-    
-    UNPROTECT(1);
-    return( re );
-}
 
 // [[Rcpp::export]]
 List schedule(const SEXP listOrEnv, 
@@ -452,8 +348,12 @@ List schedule(const SEXP listOrEnv,
     // std::vector<R_xlen_t> partitions(0);
     int n_protected = 0;
     
-    SEXP sliceIdx = PROTECT(locationList(listOrEnv, dim, strict));
-    n_protected++;
+    
+    SEXP sliceIdx = listOrEnv;
+    if( Rf_getAttrib(sliceIdx, Rf_install("_asis_")) == R_NilValue ){
+        sliceIdx = PROTECT(locationList(listOrEnv, dim, strict));
+        n_protected++;
+    }
     
     // split dim into 1:split_dim, split_dim+1: ndims
     R_xlen_t ndims = dim.length();
@@ -508,7 +408,7 @@ List schedule(const SEXP listOrEnv,
         if( l2 > l1 ){
             SEXP tmp = PROTECT(Rf_allocVector(REALSXP, l2 - l1));
             n_protected++;
-            Rf_setAttrib(tmp, R_ClassSymbol, wrap("integer64"));
+            Rf_setAttrib(tmp, R_ClassSymbol, Shield<SEXP>(wrap("integer64")));
             lastptr2 = ((int64_t*) REAL(last_dim)) + l1;
             tmpptr = (int64_t*) REAL(tmp);
             R_xlen_t part_start = part > 0 ? cum_part_sizes[part - 1] : 0;
@@ -542,7 +442,7 @@ List schedule(const SEXP listOrEnv,
     if( l2 > l1 ){
         SEXP tmp = PROTECT(Rf_allocVector(REALSXP, l2 - l1));
         n_protected++;
-        Rf_setAttrib(tmp, R_ClassSymbol, wrap("integer64"));
+        Rf_setAttrib(tmp, R_ClassSymbol, Shield<SEXP>(wrap("integer64")));
         lastptr2 = ((int64_t*) REAL(last_dim)) + l1;
         tmpptr = (int64_t*) REAL(tmp);
         R_xlen_t part_start = part > 0 ? cum_part_sizes[part - 1] : 0;
@@ -570,56 +470,62 @@ List schedule(const SEXP listOrEnv,
         part_size--;
     }
     
+    // get idx1 range
+    SEXP idx1range = PROTECT(Rf_allocVector(REALSXP, 2));
+    n_protected++;
+    int64_t* idx1_start = (int64_t*) REAL(idx1range);
+    int64_t* idx1_end = idx1_start + 1;
+    *idx1_start = NA_INTEGER64;
+    *idx1_end = -1;
+    int64_t* ptr = (int64_t*) REAL(idx1); 
+    R_xlen_t idx1len = Rf_xlength(idx1);
+    R_xlen_t i = 0;
+    for(ptr = (int64_t*) REAL(idx1), i = 0; i < idx1len; i++, ptr++ ){
+        if( *ptr == NA_INTEGER64 ){
+            continue;
+        }
+        if( *ptr < *idx1_start || *idx1_start == NA_INTEGER64 ){
+            *idx1_start = *ptr;
+        }
+        if( *idx1_end < *ptr ){
+            *idx1_end = *ptr;
+        }
+    }
+    
+    SEXP result_length = PROTECT(Rf_allocVector(INT64SXP, 1)); n_protected++;
+    Rf_setAttrib(result_length, R_ClassSymbol, Shield<SEXP>(wrap("integer64")));
+    *(INTEGER64(result_length)) = idx1len * idx2lens[part_size];
+    
     List re = List::create(
         _["idx1"] = idx1,
         _["idx2s"] = idx2s,
         _["block_size"] = block_size,
         _["partitions"] = partitions[seq(0, part_size)],
         _["idx2lens"] = idx2lens[seq(0, part_size)],
-        _["result_dim"] = result_dim
+        _["result_dim"] = result_dim,
+        _["idx1range"] = idx1range,
+        _["result_length"] = result_length
     );
     
-    UNPROTECT(n_protected); // sliceIdx, result_dim, sliceIdx1, sliceIdx2, idx1, (maybe) tmp, tmp1idx
+    UNPROTECT(n_protected); // sliceIdx, result_dim, sliceIdx1, sliceIdx2, idx1, idx1range, (maybe) tmp, tmp1idx
     
     return(re);
 }
 
-int system_buffer_size(){
-    return(BUFSIZ);
-}
-
-void swap_endianess(void *ptr, size_t size, size_t nmemb){
-    unsigned char *buffer_src = (unsigned char*)ptr;
-    unsigned char *buffer_dst = new unsigned char[size];
-    size_t ix = 0;
-    for (size_t i = 0; i < nmemb; i++, buffer_src += size) {
-        for (ix = 0; ix < size; ix++) {
-            *(buffer_dst + (size - 1 - ix)) = *(buffer_src + ix);
-        }
-        memcpy(buffer_src, buffer_dst, size);
+SEXP seq_len_int64(const R_xlen_t len){
+    SEXP tmp = PROTECT(Rf_allocVector(REALSXP, len));
+    Rf_setAttrib(tmp, R_ClassSymbol, Shield<SEXP>(wrap("integer64")));
+    int64_t* tmpptr = (int64_t*) REAL(tmp);
+    for(R_xlen_t ii = 1; ii <= len; ii++, tmpptr++){
+        *tmpptr = ii;
     }
-    delete[] buffer_dst;
+    UNPROTECT(1);
+    return tmp;
 }
 
-size_t lendian_fread(void *ptr, size_t size, size_t nmemb, FILE *stream) {
-    const size_t len = fread(ptr, size, nmemb, stream);
-    if( !isLittleEndian() ){
-        // little endian to big endian
-        swap_endianess(ptr, size, nmemb);
-    }
-    return( len );
+double prod_double(const NumericVector& x){
+    if(x.length() == 0){ return(0.0); }
+    double re = 1.0;
+    re = std::accumulate(x.begin(), x.end(), re, std::multiplies<double>());
+    return(re);
 }
-
-size_t lendian_fwrite(void *ptr, size_t size, size_t nmemb, FILE *stream) {
-    if( !isLittleEndian() ){
-        // big endian to little endian
-        swap_endianess(ptr, size, nmemb);
-    }
-    return( fwrite(ptr, size, nmemb, stream) );
-}
-
-
-
-/*** R
-(function(...){ check_missing_dots(environment()) })(,,1)
-*/

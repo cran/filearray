@@ -1,185 +1,110 @@
-#include "common.h"
+#include <boost/interprocess/file_mapping.hpp>
+#include <boost/interprocess/mapped_region.hpp>
+// [[Rcpp::depends(BH)]]
+
+#include "core.h"
+#include "serialize.h"
+#include "conversion.h"
+#include "utils.h"
 using namespace Rcpp;
 
-SEXP each_partition_integer(
-        FILE* conn, const int64_t exp_len, const SEXP& buffer, 
-        const Function fun, int64_t* count, List ret){
-    
-    size_t elem_size = sizeof(int);
-    
-    fseek(conn, FARR_HEADER_LENGTH, SEEK_SET);
-    
+
+template <typename T, typename B>
+SEXP each_partition_template(
+        T* mmap_ptr, const int64_t& mmap_size,
+        const int64_t exp_len, 
+        const Function fun, int64_t* count, List& ret,
+        B* argbuf_ptr, SEXP argbuf,
+        void (*transform) (const T*, B*, const int&, const bool&)
+) {
+    bool swap_endian = !isLittleEndian();
     int64_t read_len = 0, current_pos = 0;
     
-    int* bufptr = INTEGER(buffer);
-    R_xlen_t bufferlen = Rf_xlength(buffer);
+    const int buffer_nelems = Rf_length(argbuf);
     
     int64_t rest_len = 0;
     
     while(current_pos < exp_len){
-        bufptr = INTEGER(buffer);
-        read_len = lendian_fread(bufptr, elem_size, bufferlen, conn);
-        for(; read_len < bufferlen; read_len++){
-            *(bufptr + read_len) = NA_INTEGER;
+        read_len = exp_len - current_pos;
+        if( read_len > buffer_nelems ){
+            read_len = buffer_nelems;
         }
-        rest_len = exp_len - current_pos;
-        if( rest_len > bufferlen ){
-            rest_len = bufferlen;
+        if( read_len + current_pos > mmap_size ){
+            read_len = mmap_size - current_pos;
         }
-        ret.push_back( fun(buffer, wrap(rest_len), wrap(*count)) );
-        current_pos += rest_len;
-        *count += rest_len;
-    }
-    
-    return( ret );
-    
-}
-
-SEXP each_partition_double(
-        FILE* conn, const int64_t exp_len, const SEXP& buffer, 
-        const Function fun, int64_t* count, List ret){
-    
-    size_t elem_size = sizeof(double);
-    
-    fseek(conn, FARR_HEADER_LENGTH, SEEK_SET);
-    
-    int64_t read_len = 0, current_pos = 0;
-    
-    double* bufptr = REAL(buffer);
-    R_xlen_t bufferlen = Rf_xlength(buffer);
-    
-    int64_t rest_len = 0;
-    
-    while(current_pos < exp_len){
-        bufptr = REAL(buffer);
-        read_len = lendian_fread(bufptr, elem_size, bufferlen, conn);
-        for(; read_len < bufferlen; read_len++){
-            *(bufptr + read_len) = NA_REAL;
-        }
-        rest_len = exp_len - current_pos;
-        if( rest_len > bufferlen ){
-            rest_len = bufferlen;
-        }
-        ret.push_back( fun(buffer, wrap(rest_len), wrap(*count)) );
-        current_pos += rest_len;
-        *count += rest_len;
-    }
-    
-    return( ret );
-    
-}
-
-SEXP each_partition_raw(
-        FILE* conn, const int64_t exp_len, const SEXP& buffer, 
-        const Function fun, int64_t* count, List ret){
-    
-    size_t elem_size = sizeof(Rbyte);
-    
-    fseek(conn, FARR_HEADER_LENGTH, SEEK_SET);
-    
-    int64_t read_len = 0, current_pos = 0;
-    
-    Rbyte* bufptr = RAW(buffer);
-    R_xlen_t bufferlen = Rf_xlength(buffer);
-    
-    int64_t rest_len = 0;
-    
-    while(current_pos < exp_len){
-        bufptr = RAW(buffer);
-        read_len = lendian_fread(bufptr, elem_size, bufferlen, conn);
-        for(; read_len < bufferlen; read_len++){
-            *(bufptr + read_len) = 0;
-        }
-        rest_len = exp_len - current_pos;
-        if( rest_len > bufferlen ){
-            rest_len = bufferlen;
-        }
-        ret.push_back( fun(buffer, wrap(rest_len), wrap(*count)) );
-        current_pos += rest_len;
-        *count += rest_len;
-    }
-    
-    return( ret );
-    
-}
-
-SEXP each_partition_logical(
-        FILE* conn, const int64_t exp_len, const SEXP& buffer, 
-        const Function fun, int64_t* count, List ret){
-    
-    size_t elem_size = sizeof(Rbyte);
-    int* bufptr = LOGICAL(buffer);
-    R_xlen_t bufferlen = Rf_xlength(buffer);
-    
-    SEXP buf2 = PROTECT(Rf_allocVector(RAWSXP, bufferlen));
-    Rbyte* buf2ptr = RAW(buf2);
-    
-    fseek(conn, FARR_HEADER_LENGTH, SEEK_SET);
-    
-    int64_t read_len = 0, current_pos = 0;
-    int64_t rest_len = 0, jj = 0;
-    
-    while(current_pos < exp_len){
-        buf2ptr = RAW(buf2);
-        read_len = lendian_fread(buf2ptr, elem_size, bufferlen, conn);
+        // read_len = lendian_fread(filebuf_ptr, elem_size, buffer_nelems, conn);
+        transform(mmap_ptr, argbuf_ptr, read_len, swap_endian);
         
-        bufptr = LOGICAL(buffer);
-        for(jj = 0; jj < read_len; jj++, bufptr++, buf2ptr++){
-            if(*buf2ptr >= 2){
-                *bufptr = NA_LOGICAL;
+        if( read_len > 0 ){
+            if( read_len < buffer_nelems ){
+                // if( tmp_arg == R_NilValue ){
+                //     tmp_arg = PROTECT(sub_vec_range(argbuf, 0, read_len));
+                // } else if( read_len - Rf_xlength(tmp_arg) != 0 ){
+                //     UNPROTECT(1);
+                //     tmp_arg = PROTECT(sub_vec_range(argbuf, 0, read_len));
+                // }
+                SEXP tmp_arg = Shield<SEXP>(sub_vec_range(argbuf, 0, read_len));
+                ret.push_back( Shield<SEXP>( fun(Shield<SEXP>(tmp_arg), Shield<SEXP>(wrap(read_len)), Shield<SEXP>(wrap(*count))) ) );
             } else {
-                *bufptr = *buf2ptr;
+                ret.push_back( Shield<SEXP>( fun(Shield<SEXP>(argbuf), Shield<SEXP>(wrap(read_len)), Shield<SEXP>(wrap(*count))) ) );
             }
         }
-        for(; jj < bufferlen; jj++, bufptr++){
-            *bufptr = NA_LOGICAL;
-        }
+        
         rest_len = exp_len - current_pos;
-        if( rest_len > bufferlen ){
-            rest_len = bufferlen;
+        if( rest_len > buffer_nelems ){
+            rest_len = buffer_nelems;
         }
-        ret.push_back( fun(buffer, wrap(rest_len), wrap(*count)) );
         current_pos += rest_len;
         *count += rest_len;
     }
-    
-    UNPROTECT(1);
+    // if( tmp_arg != R_NilValue ){
+    //     UNPROTECT(1);
+    // }
     
     return( ret );
-    
 }
 
 // [[Rcpp::export]]
 SEXP FARR_buffer_mapreduce(
-    const std::string& filebase, 
-    const Function map, const Nullable<Function> reduce,
-    const NumericVector& dim,
-    const NumericVector& partition_cumlens, 
-    const int bufferlen, const SEXPTYPE x_type
+        const std::string& filebase, 
+        const Function map, 
+        const Nullable<Function> reduce,
+        const int& buffer_nelems
 ){
-    int64_t count = 1;
-    int64_t count2 = 1;
-    R_xlen_t nparts = partition_cumlens.length();
+    std::string fbase = correct_filebase(filebase);
+    const List meta = FARR_meta(fbase);
+    const SEXPTYPE x_type = meta["sexp_type"];
+    
+    SEXP dim_ = meta["dimension"];
+    realToInt64_inplace(dim_);
+    int ndims = Rf_length(dim_);
+    
+    SEXP pcumlens = meta["cumsum_part_sizes"];
+    realToInt64_inplace(pcumlens);
+    R_xlen_t nparts = Rf_xlength(pcumlens);
     
     // int64_t bufferlen = get_buffer_size() / elem_size;
-    SEXP buffer = PROTECT(Rf_allocVector(x_type, bufferlen));
+    SEXPTYPE argtype = x_type == FLTSXP ? REALSXP : x_type;
     
+    SEXP argbuffer = PROTECT(Rf_allocVector(argtype, buffer_nelems)); 
+    
+    // estimate number of runs (TODO)
     List ret = List::create();
     
-    SEXP dim_ = PROTECT(realToUint64(dim, 0, 1200000000000000000, 1));
-    SEXP pcumlens = PROTECT(realToUint64(partition_cumlens, 0, 1200000000000000000, 1));
-    int64_t* dimptr = (int64_t*) REAL(dim_);
+    int64_t* dimptr = INTEGER64(dim_);
     int64_t plen = 1;
-    for(R_xlen_t ii = 0; ii < dim.length() - 1; ii++, dimptr++){
+    for(R_xlen_t ii = 0; ii <ndims - 1; ii++, dimptr++){
         plen *= *dimptr;
     }
     int64_t* pclptr = (int64_t*) REAL(pcumlens);
     int64_t psize = 0;
     
     std::string partition_path = "";
-    FILE* conn = NULL;
+    int64_t count = 1;
+    int64_t count2 = 1;
+    const boost::interprocess::mode_t mode = boost::interprocess::read_only;
     for(R_xlen_t part = 0; part < nparts; part++){
-        partition_path = filebase + std::to_string(part) + ".farr";
+        partition_path = fbase + std::to_string(part) + ".farr";
         
         if(part == 0){
             count = count2;
@@ -189,53 +114,94 @@ SEXP FARR_buffer_mapreduce(
             count = count2 + plen * (*pclptr + (part-1));
         }
         
-        
-        conn = fopen(partition_path.c_str(), "rb");
-        
-        if( conn ){
-            try{
-                switch(x_type){
-                case INTSXP:
-                    ret = each_partition_integer(conn, psize * plen, buffer, map, &(count), ret);
-                    break;
-                case REALSXP:
-                    ret = each_partition_double(conn, psize * plen, buffer, map, &(count), ret);
-                    break;
-                case RAWSXP:
-                    ret = each_partition_raw(conn, psize * plen, buffer, map, &(count), ret);
-                    break;
-                case LGLSXP:
-                    ret = each_partition_logical(conn, psize * plen, buffer, map, &(count), ret);
-                    break;
-                default: 
-                    fclose(conn);
-                    conn = NULL;
-                }
-            } catch(...){}
-            if(conn != NULL){
-                fclose(conn);
-                conn = NULL;
+        try {
+            boost::interprocess::file_mapping fm(partition_path.c_str(), mode);
+            boost::interprocess::mapped_region region(fm, mode, FARR_HEADER_LENGTH);
+            region.advise(boost::interprocess::mapped_region::advice_sequential);
+            
+            int64_t region_size = region.get_size();
+            
+            switch(x_type){
+            case INTSXP: {
+                int* begin = static_cast<int*>(region.get_address());
+                each_partition_template(
+                    begin, region_size / sizeof(int),
+                    psize * plen, map, &(count), ret,
+                    INTEGER(argbuffer), argbuffer,
+                    transforms_asis);
+                break;
             }
-        }
+            case REALSXP: {
+                
+                double* begin = static_cast<double*>(region.get_address());
+                each_partition_template(
+                    begin, region_size / sizeof(double),
+                    psize * plen, map, &(count), ret,
+                    REAL(argbuffer), argbuffer,
+                    transforms_asis);
+                break;
+            }
+            case FLTSXP: {
+                
+                float* begin = static_cast<float*>(region.get_address());
+                each_partition_template(
+                    begin, region_size / sizeof(float),
+                    psize * plen, map, &(count), ret,
+                    REAL(argbuffer), argbuffer,
+                    transforms_float);
+                break;
+            }
+            case RAWSXP: {
+                Rbyte* begin = static_cast<Rbyte*>(region.get_address());
+                each_partition_template(
+                    begin, region_size / sizeof(Rbyte),
+                    psize * plen, map, &(count), ret,
+                    RAW(argbuffer), argbuffer,
+                    transforms_asis);
+                break;
+            }
+            case LGLSXP: {
+                
+                Rbyte* begin = static_cast<Rbyte*>(region.get_address());
+                each_partition_template(
+                    begin, region_size / sizeof(Rbyte),
+                    psize * plen, map, &(count), ret,
+                    LOGICAL(argbuffer), argbuffer,
+                    transforms_logical);
+                break;
+            }
+            case CPLXSXP: {
+                double* begin = static_cast<double*>(region.get_address());
+                each_partition_template(
+                    begin, region_size / sizeof(double),
+                    psize * plen, map, &(count), ret,
+                    COMPLEX(argbuffer), argbuffer,
+                    transforms_complex);
+                break;
+            }
+            }
+        } catch (...) {}
+        
     }
     
     if(reduce == R_NilValue){
-        UNPROTECT(3);
+        UNPROTECT( 1 );
         return ret;
     }
     
     Function reduce2 = (Function) reduce;
     SEXP re = PROTECT(reduce2(ret));
-    UNPROTECT(4);
+    UNPROTECT( 2 );
     return(re);
 }
 
+
 /*** R
 # devtools::load_all()
-dim <- c(100,100,100,100)
+dim <- 33:35
 set.seed(1); file <- tempfile(); unlink(file, recursive = TRUE)
 x <- filearray_create(file, dim)
-tmp <- seq_len(1e8)
+tmp <- seq_len(prod(dim))
 setThreads(8)
 system.time({
     x[] <- tmp

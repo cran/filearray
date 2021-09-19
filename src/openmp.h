@@ -11,14 +11,8 @@
 #define FARR_HAS_OPENMP false
 #endif
 
-#include <Rcpp.h>
+#include "common.h"
 #include <algorithm>
-
-static int ompThreads = 0;
-
-// stores n threads when fork occurs
-static bool detectFork = false;
-static int resetForked = true;
 
 
 // [[Rcpp::export]]

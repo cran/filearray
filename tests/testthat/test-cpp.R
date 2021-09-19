@@ -1,9 +1,9 @@
+require(testthat)
 as_int64 <- function(x){
-    realToUint64(x, -2L^30, 2L^30, 0L)
+    realToInt64(x, NA_real_, NA_real_, 0L)
 }
 
 test_that("C++: Utils", {
-    
     misdot <- function(...){
         check_missing_dots(environment())
     }
@@ -53,25 +53,33 @@ test_that("C++: Utils", {
     
 })
 
-
 test_that("C++: IO - subset/assign", {
+    bsz <- get_buffer_size()
+    on.exit({
+        set_buffer_size(bsz)
+        max_buffer_size(2097152)
+    })
+    set_buffer_size(16L)
+    max_buffer_size(64L)
     
     set.seed(NULL)
     file <- tempfile()
     unlink(file, recursive = TRUE)
-    dim <- 3:5
+    dim <- 33:35
     x <- filearray_create(file, dim, partition_size = 2)
     
     expect_equal(x[[2]], x$.na)
     
     y <- array(x$.na, dim)
-    x[3:1, , c(5,2,1,3,4)] <- 1:60
-    y[3:1, , c(5,2,1,3,4)] <- 1:60
+    x[33:1, , c(35,2,1,3,4,5:34)] <- 1:prod(dim)
+    y[33:1, , c(35,2,1,3,4,5:34)] <- 1:prod(dim)
     
     expect_equal(x[], y)
     locs <-
         lapply(dim, function(d) {
-            as.double(sample(c(1:d, NA, NA), size = 10, replace = TRUE))
+            d1 <- sample(c(1:d), 10, replace = TRUE)
+            d2 <- c(NA, NA)
+            as.double(sample(c(d1,d2)))
         })
     expect_equal(
         x[locs[[1]], locs[[2]], locs[[3]]],
@@ -85,7 +93,9 @@ test_that("C++: IO - subset/assign", {
     
     locs <-
         lapply(dim, function(d) {
-            as.double(sample(c(1:d, NA, NA), size = d, replace = FALSE))
+            d1 <- sample(c(1:d), 10, replace = TRUE)
+            d2 <- c(NA, NA)
+            as.double(sample(c(d1,d2)))
         })
     expect_error({
         x[locs[[1]], locs[[2]], locs[[3]]] <- 1:prod(sapply(locs, length))
@@ -107,18 +117,215 @@ test_that("C++: IO - subset/assign", {
     
     expect_equal(x[], y)
     
-    expect_error(x[c(TRUE,TRUE,TRUE,FALSE),,])
-    expect_error(x[c(TRUE,TRUE,TRUE,NA),,])
+    expect_error(x[c(rep(c(TRUE,TRUE,TRUE, TRUE),8), TRUE, FALSE),,])
+    expect_error(x[c(rep(c(TRUE,TRUE,TRUE, TRUE),8), TRUE, NA),,])
     
     unlink(file, recursive = TRUE)
     x <- filearray_create(file, dim, partition_size = 2)
     y <- array(x$.na, dim)
-    x[3:1, , c(TRUE, FALSE, TRUE)] <- 1:36
-    y[3:1, , c(TRUE, FALSE, TRUE)] <- 1:36
+    x[33:1, , c(35,2,1,3,4,5:34)] <- 1:prod(dim)
+    y[33:1, , c(35,2,1,3,4,5:34)] <- 1:prod(dim)
     expect_equal(x[], y)
     
     expect_error({
-        x[3:1, , c(TRUE, FALSE, TRUE, TRUE, NA)] <- 1:36
+        x[3:1, , c(TRUE, FALSE, TRUE, TRUE, rep(NA, 29))] <- 1:36
+    })
+    
+    unlink(file, recursive = TRUE)
+})
+
+test_that("C++: IO - subset/assign - complex", {
+    bsz <- get_buffer_size()
+    on.exit({
+        set_buffer_size(bsz)
+        max_buffer_size(2097152)
+    })
+    set_buffer_size(16L)
+    max_buffer_size(64L)
+    
+    set.seed(8)
+    file <- tempfile()
+    unlink(file, recursive = TRUE)
+    dim <- 33:35
+    x <- filearray_create(file, dim, partition_size = 2, type = "complex")
+    
+    expect_equal(x[[2]], x$.na)
+    
+    y <- array(x$.na, dim)
+    tmp <- rnorm(prod(dim)) + 1i*runif(prod(dim))
+    x[33:1, , c(35,2,1,3,4,5:34)] <- tmp
+    y[33:1, , c(35,2,1,3,4,5:34)] <- tmp
+    
+    expect_lt(max(Mod(x[] - y)), 1e-6)
+    locs <-
+        lapply(dim, function(d) {
+            d1 <- sample(c(1:d), 10, replace = TRUE)
+            d2 <- c(NA, NA)
+            as.double(sample(c(d1,d2)))
+        })
+    max_dif <- max(Mod(
+        x[locs[[1]], locs[[2]], locs[[3]]] -
+            y[locs[[1]], locs[[2]], locs[[3]]]
+    ), na.rm = TRUE)
+    expect_lt(max_dif, 1e-5)
+    if(max_dif > 1e-6){
+        print(max_dif)
+    }
+    expect_equal(is.na(x[locs[[1]], locs[[2]], locs[[3]]]),
+                 is.na(y[locs[[1]], locs[[2]], locs[[3]]]))
+    expect_lt(
+        max(Mod(
+            x[,,c(TRUE, NA, FALSE)] -
+                y[,,c(TRUE, NA, FALSE)]
+        ), na.rm = TRUE),
+        1e-6
+    )
+    expect_equal(is.na(x[,,c(TRUE, NA, FALSE)]),
+                 is.na(y[,,c(TRUE, NA, FALSE)]))
+    
+    expect_error({
+        x[locs[[1]], locs[[2]], locs[[3]]] <- tmp[1:prod(sapply(locs, length))]
+    })
+    
+    locs <-
+        lapply(dim, function(d) {
+            d1 <- sample(c(1:d), 10, replace = TRUE)
+            d2 <- c(NA, NA)
+            as.double(sample(c(d1,d2)))
+        })
+    expect_error({
+        x[locs[[1]], locs[[2]], locs[[3]]] <- tmp[1:prod(sapply(locs, length))]
+    })
+    
+    locs <-
+        lapply(dim, function(d) {
+            sample(c(1:d), size = d, replace = FALSE)
+        })
+    expect_error({
+        x[locs[[1]], locs[[2]], locs[[3]]] <- 1
+    })
+    
+    expect_true({
+        x[locs[[1]], locs[[2]], locs[[3]]] <- tmp[1:prod(sapply(locs, length))]
+        TRUE
+    })
+    y[locs[[1]], locs[[2]], locs[[3]]] <- tmp[1:prod(sapply(locs, length))]
+    
+    expect_lt(max(Mod(x[] - y)), 1e-6)
+    
+    expect_error(x[c(rep(c(TRUE,TRUE,TRUE, TRUE),8), TRUE, FALSE),,])
+    expect_error(x[c(rep(c(TRUE,TRUE,TRUE, TRUE),8), TRUE, NA),,])
+    
+    unlink(file, recursive = TRUE)
+    x <- filearray_create(file, dim, partition_size = 2, type = 'complex')
+    y <- array(x$.na, dim)
+    x[33:1, , c(35,2,1,3,4,5:34)] <- tmp
+    y[33:1, , c(35,2,1,3,4,5:34)] <- tmp
+    expect_lt(max(Mod(x[] - y)), 1e-6)
+    
+    expect_error({
+        x[3:1, , c(TRUE, FALSE, TRUE, TRUE, rep(NA, 29))] <- tmp[1:36]
+    })
+    
+    unlink(file, recursive = TRUE)
+})
+
+test_that("C++: IO - subset/assign - float", {
+    bsz <- get_buffer_size()
+    on.exit({
+        set_buffer_size(bsz)
+        max_buffer_size(2097152)
+    })
+    set_buffer_size(16L)
+    max_buffer_size(64L)
+    
+    set.seed(NULL)
+    file <- tempfile()
+    unlink(file, recursive = TRUE)
+    dim <- 33:35
+    x <- filearray_create(file, dim, partition_size = 2, type = "float")
+    
+    expect_equal(x[[2]], x$.na)
+    
+    y <- array(x$.na, dim)
+    tmp <- rnorm(prod(dim))
+    x[33:1, , c(35,2,1,3,4,5:34)] <- tmp
+    y[33:1, , c(35,2,1,3,4,5:34)] <- tmp
+    
+    eps <- 10^(ceiling(log10(max(abs(y)))) - 7)
+    expect_equal(x[], y, tolerance = eps)
+    y[] <- x[]
+    locs <-
+        lapply(dim, function(d) {
+            d1 <- sample(c(1:d), 10, replace = TRUE )
+            d2 <- c(NA, NA)
+            as.double(sample(c(d1,d2)))
+        })
+    
+    a <- x[locs[[1]], locs[[2]], locs[[3]]]
+    b <- y[locs[[1]], locs[[2]], locs[[3]]]
+    expect_equal(is.na(a), is.na(b))
+    
+    sel <- !is.na(a-b) & (a-b) > eps
+    if(length(a[sel])){
+        # fail the test
+        print(a[sel])
+        print(b[sel])
+        expect_length(object = (a-b)[sel], n = 0)
+    }
+    
+    
+    
+    a <- x[c(1,1,2,2,1,1,2,2), 1, c(2,2)]
+    b <- y[c(1,1,2,2,1,1,2,2), 1, c(2,2)]
+    # a <- x[c(1,1,2,2), c(1,1,2,2), 1]
+    # b <- y[c(1,1,2,2), c(1,1,2,2), 1]
+    expect_equal(a, b, tolerance = eps)
+    
+    expect_equal(x[,,c(TRUE, NA, FALSE)], y[,,c(TRUE, NA, FALSE)])
+    
+    expect_error({
+        x[locs[[1]], locs[[2]], locs[[3]]] <- 1:prod(sapply(locs, length))
+    })
+    
+    locs <-
+        lapply(dim, function(d) {
+            d1 <- sample(c(1:d), 10, replace = TRUE)
+            d2 <- c(NA, NA)
+            as.double(sample(c(d1,d2)))
+        })
+    expect_error({
+        x[locs[[1]], locs[[2]], locs[[3]]] <- 1:prod(sapply(locs, length))
+    })
+    
+    locs <-
+        lapply(dim, function(d) {
+            sample(c(1:d), size = d, replace = FALSE)
+        })
+    expect_error({
+        x[locs[[1]], locs[[2]], locs[[3]]] <- 1
+    })
+    
+    expect_true({
+        x[locs[[1]], locs[[2]], locs[[3]]] <- 1:prod(sapply(locs, length))
+        TRUE
+    })
+    y[locs[[1]], locs[[2]], locs[[3]]] <- 1:prod(sapply(locs, length))
+    
+    expect_equal(x[], y)
+    
+    expect_error(x[c(rep(c(TRUE,TRUE,TRUE, TRUE),8), TRUE, FALSE),,])
+    expect_error(x[c(rep(c(TRUE,TRUE,TRUE, TRUE),8), TRUE, NA),,])
+    
+    unlink(file, recursive = TRUE)
+    x <- filearray_create(file, dim, partition_size = 2)
+    y <- array(x$.na, dim)
+    x[33:1, , c(35,2,1,3,4,5:34)] <- 1:prod(dim)
+    y[33:1, , c(35,2,1,3,4,5:34)] <- 1:prod(dim)
+    expect_equal(x[], y)
+    
+    expect_error({
+        x[3:1, , c(TRUE, FALSE, TRUE, TRUE, rep(NA, 29))] <- 1:36
     })
     
     unlink(file, recursive = TRUE)
@@ -163,3 +370,4 @@ test_that("C++: IO - type conversion", {
     expect_equal(x[], y)
     unlink(file, recursive = TRUE)
 })
+

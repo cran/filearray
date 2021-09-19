@@ -6,8 +6,13 @@ NULL
 
 .onLoad <- function(libname, pkgname){
     if(hasOpenMP()){
-        filearray_threads(-1)
+        n <- filearray_threads(-1)
+        if(n > 8){
+            filearray_threads(8)
+        }
     }
+    ns <- asNamespace(pkgname)
+    ns$NA_float_ <- get_float_na()
 }
 
 .onAttach <- function(libname, pkgname){

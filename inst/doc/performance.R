@@ -1,0 +1,222 @@
+## ---- include = FALSE---------------------------------------------------------
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  eval = FALSE,
+  comment = "#>"
+)
+
+## ----setup--------------------------------------------------------------------
+#  library(filearray)
+#  
+#  options(digits = 3)
+#  filearray_threads()
+#  #> [1] 8
+#  
+#  # Create file array and initialize partitions
+#  set.seed(1)
+#  file <- tempfile(); unlink(file, recursive = TRUE)
+#  x_dbl <- filearray_create(file, rep(100, 4))
+#  x_dbl$initialize_partition()
+#  
+#  file <- tempfile(); unlink(file, recursive = TRUE)
+#  x_flt <- filearray_create(file, rep(100, 4), type = 'float')
+#  x_flt$initialize_partition()
+#  
+#  # 800 MB double array
+#  y <- array(rnorm(length(x_dbl)), dim(x_dbl))
+
+## -----------------------------------------------------------------------------
+#  microbenchmark::microbenchmark(
+#    double = {
+#      for(i in 1:100){
+#        x_dbl[,,,i] <- y[,,,i]
+#      }
+#    },
+#    float = {
+#      for(i in 1:100){
+#        x_flt[,,,i] <- y[,,,i]
+#      }
+#    }, unit = 's', times = 3
+#  )
+#  
+#  #> Unit: seconds
+#  #>    expr   min    lq mean median   uq  max neval
+#  #>  double 0.933 0.935 1.44  0.936 1.69 2.45     3
+#  #>   float 1.027 1.057 1.07  1.086 1.10 1.11     3
+
+## -----------------------------------------------------------------------------
+#  microbenchmark::microbenchmark(
+#    double = {
+#      for(i in 1:100){
+#        x_dbl[,,i,] <- y[,,i,]
+#      }
+#    },
+#    float = {
+#      for(i in 1:100){
+#        x_flt[,,i,] <- y[,,i,]
+#      }
+#    }, unit = 's', times = 3
+#  )
+#  
+#  #> Unit: seconds
+#  #>   expr  min   lq mean median   uq  max neval
+#  #> double 1.23 1.27 1.47   1.30 1.59 1.89     3
+#  #>  float 1.23 1.24 1.41   1.24 1.50 1.76     3
+
+## -----------------------------------------------------------------------------
+#  microbenchmark::microbenchmark(
+#    double = {
+#      for(i in 1:100){
+#        x_dbl[i,,,] <- y[i,,,]
+#      }
+#    },
+#    float = {
+#      for(i in 1:100){
+#        x_flt[i,,,] <- y[i,,,]
+#      }
+#    }, unit = 's', times = 3
+#  )
+#  #> Unit: seconds
+#  #>    expr   min    lq  mean median    uq   max neval
+#  #>  double  3.18  3.22  3.28   3.27  3.32  3.38     3
+#  #>   float 20.04 20.04 20.44  20.05 20.64 21.22     3
+
+## -----------------------------------------------------------------------------
+#  microbenchmark::microbenchmark(
+#    double = {
+#      for(i in 1:10){
+#        idx <- (i-1)*10 + 1:10
+#        x_dbl[,,,idx] <- y[,,,idx]
+#      }
+#    },
+#    float = {
+#      for(i in 1:10){
+#        idx <- (i-1)*10 + 1:10
+#        x_flt[,,,idx] <- y[,,,idx]
+#      }
+#    }, unit = 's', times = 3
+#  )
+#  
+#  #> Unit: seconds
+#  #>    expr   min    lq  mean median    uq  max neval
+#  #>  double 0.650 0.684 0.911  0.718 1.041 1.37     3
+#  #>   float 0.626 0.662 0.783  0.698 0.861 1.02     3
+
+## -----------------------------------------------------------------------------
+#  microbenchmark::microbenchmark(
+#    double = {
+#      for(i in 1:10){
+#        idx <- (i-1)*10 + 1:10
+#        x_dbl[,,idx,] <- y[,,idx,]
+#      }
+#    },
+#    float = {
+#      for(i in 1:10){
+#        idx <- (i-1)*10 + 1:10
+#        x_flt[,,idx,] <- y[,,idx,]
+#      }
+#    }, unit = 's', times = 3
+#  )
+#  
+#  #> Unit: seconds
+#  #>    expr   min    lq  mean median    uq   max neval
+#  #>  double 0.582 0.620 0.668  0.657 0.710 0.763     3
+#  #>   float 0.625 0.652 0.732  0.679 0.786 0.893     3
+
+## -----------------------------------------------------------------------------
+#  microbenchmark::microbenchmark(
+#    double = {
+#      for(i in 1:10){
+#        idx <- (i-1)*10 + 1:10
+#        x_dbl[idx,,,] <- y[idx,,,]
+#      }
+#    },
+#    float = {
+#      for(i in 1:10){
+#        idx <- (i-1)*10 + 1:10
+#        x_flt[idx,,,] <- y[idx,,,]
+#      }
+#    }, unit = 's', times = 3
+#  )
+#  #> Unit: seconds
+#  #>    expr  min   lq mean median   uq  max neval
+#  #>  double 4.48 4.48 4.64   4.48 4.72 4.95     3
+#  #>   float 2.64 2.70 2.73   2.77 2.78 2.79     3
+
+## -----------------------------------------------------------------------------
+#  microbenchmark::microbenchmark(
+#    double = { x_dbl[] },
+#    float = { x_flt[] },
+#    unit = 's', times = 3
+#  )
+#  
+#  #> Unit: seconds
+#  #>    expr   min    lq  mean median    uq   max neval
+#  #>  double 0.155 0.172 0.185  0.188 0.200 0.211     3
+#  #>   float 0.104 0.106 0.144  0.107 0.164 0.220     3
+
+## -----------------------------------------------------------------------------
+#  microbenchmark::microbenchmark(
+#    farr_double_partition_margin = { x_dbl[,,,1] },
+#    farr_double_fast_margin = { x_dbl[,,1,] },
+#    farr_double_slow_margin = { x_dbl[1,,,] },
+#    farr_float_partition_margin = { x_flt[,,,1] },
+#    farr_float_fast_margin = { x_flt[,,1,] },
+#    farr_float_slow_margin = { x_flt[1,,,] },
+#    native_partition_margin = { y[,,,1] },
+#    native_fast_margin = { y[,,1,] },
+#    native_slow_margin = { y[1,,,] },
+#    times = 100L, unit = "ms"
+#  )
+#  
+#  #> Unit: milliseconds
+#  #>                          expr   min    lq  mean median    uq    max neval
+#  #>  farr_double_partition_margin  2.01  2.66  4.02   2.85  3.64  71.06   100
+#  #>       farr_double_fast_margin  1.35  1.99  3.16   2.35  3.79  25.88   100
+#  #>       farr_double_slow_margin 33.25 36.52 44.11  37.32 38.76 125.61   100
+#  #>   farr_float_partition_margin  1.77  2.40  3.96   2.61  3.66  58.17   100
+#  #>        farr_float_fast_margin  1.33  1.85  2.80   2.08  3.43  11.01   100
+#  #>        farr_float_slow_margin 14.98 18.86 23.42  19.54 20.47 160.90   100
+#  #>       native_partition_margin  3.42  3.75  4.14   4.02  4.27   6.89   100
+#  #>            native_fast_margin  3.42  3.96  4.86   4.09  4.64  54.74   100
+#  #>            native_slow_margin 21.52 22.15 24.34  22.65 23.97  91.06   100
+
+## -----------------------------------------------------------------------------
+#  # access 50 x 50 x 50 x 50 sub-array, with random indices
+#  idx1 <- sample(1:100, 50)
+#  idx2 <- sample(1:100, 50)
+#  idx3 <- sample(1:100, 50)
+#  idx4 <- sample(1:100, 50)
+#  
+#  microbenchmark::microbenchmark(
+#    farr_double = { x_dbl[idx1, idx2, idx3, idx4] },
+#    farr_float = { x_flt[idx1, idx2, idx3, idx4] },
+#    native = { y[idx1, idx2, idx3, idx4] },
+#    times = 100L, unit = "ms"
+#  )
+#  
+#  #> Unit: milliseconds
+#  #>         expr   min    lq mean median   uq   max neval
+#  #>  farr_double 11.68 13.13 18.9  13.81 15.2 143.3   100
+#  #>   farr_float  8.29  8.89 12.0   9.95 10.6  63.6   100
+#  #>       native 30.86 31.94 34.0  32.62 33.1 103.0   100
+
+## -----------------------------------------------------------------------------
+#  keep <- c(2, 4)
+#  output <- filearray_create(tempfile(), dim(x_dbl)[keep])
+#  output$initialize_partition()
+#  microbenchmark::microbenchmark(
+#    farr_double = { x_dbl$collapse(keep = keep, method = "sum") },
+#    farr_float = { x_flt$collapse(keep = keep, method = "sum") },
+#    native = { apply(y, keep, sum) },
+#    dipsaus = { dipsaus::collapse(y, keep, average = FALSE) },
+#    unit = "s", times = 5
+#  )
+#  
+#  #> Unit: seconds
+#  #>         expr   min    lq  mean median    uq   max neval
+#  #>  farr_double 0.782 0.790 1.009  0.799 0.832 1.840     5
+#  #>   farr_float 0.765 0.779 0.929  0.930 1.043 1.127     5
+#  #>       native 0.964 1.174 1.222  1.213 1.370 1.390     5
+#  #>      dipsaus 0.185 0.190 0.202  0.199 0.203 0.233     5
+

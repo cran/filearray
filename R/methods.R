@@ -8,19 +8,20 @@
 #' @param drop whether to drop dimensions; see topic \code{\link[base]{Extract}}
 #' @param reshape a new dimension to set before returning subset results; default is \code{NULL} (use default dimensions)
 #' @param strict whether to allow indices to exceed bound; currently only accept \code{TRUE}
-#' @param value value to substitute
+#' @param dimnames whether to preserve \code{\link[base]{dimnames}}
+#' @param value value to substitute or set
 #' @param na.rm whether to remove \code{NA} values during the calculation
 #' @param i,... index set, or passed to other methods
 NULL
 
 #' @describeIn S3-filearray get element by position
 #' @export
-`[.FileArray` <- function(x, ..., drop = TRUE, reshape = NULL, strict = TRUE) {
+`[.FileArray` <- function(x, ..., drop = TRUE, reshape = NULL, strict = TRUE, dimnames = TRUE) {
     if(!x$valid()){
         stop("Invalid file array")
     }
+    drop <- isTRUE(drop)
     # file <- tempfile(); x <- filearray_create(file, c(300, 400, 100, 1))
-    filebase <- paste0(x$.filebase, x$.sep)
     arglen <- ...length()
     elem_size <- x$element_size()
     dim <- x$dimension()
@@ -66,19 +67,22 @@ NULL
     # guess split dim
     max_buffer <- max_buffer_size() / elem_size
     
-    sapply(seq_len(length(dim) - 1), function(split_dim){
-        idx1len <- prod(dim[seq_len(split_dim)])
-        idx2len <- prod(dim[-seq_len(split_dim)])
-        nloops <- ceiling(idx1len / max_buffer)
-        # buffer_sz <- ifelse(idx1len > max_buffer, max_buffer, idx1len)
-        (idx1len * nloops) * idx2len
-    })
-    
+    if(length(listOrEnv) == length(dim)){
+        idxrange <- sapply(listOrEnv, function(x){
+            if(!length(x) || all(is.na(x))){ return(1L) }
+            rg <- range(x, na.rm = TRUE)
+            return(rg[2] - rg[1] + 1)
+        })
+    } else {
+        idxrange <- dim
+    }
     # worst-case time-complexity
     time_complexity <-
         sapply(seq_len(length(dim) - 1), function(split_dim) {
             dim[[length(dim)]] <- 1
-            idx1len <- prod(dim[seq_len(split_dim)])
+            idx1dim <- dim[seq_len(split_dim)]
+            idx1dim[[split_dim]] <- idxrange[[split_dim]]
+            idx1len <- prod(idx1dim)
             idx2len <- prod(dim[-seq_len(split_dim)])
             buffer_sz <-
                 ifelse(idx1len > max_buffer, max_buffer, idx1len)
@@ -88,28 +92,18 @@ NULL
     split_dim <- which.min(time_complexity)
     split_dim <- split_dim[[length(split_dim)]]
     
-    # set buffer size
-    idx1len <- prod(dim[seq_len(split_dim)])
-    buffer_sz <- idx1len * elem_size
-    buffer_sz <- ifelse(buffer_sz > max_buffer, max_buffer, buffer_sz)
-    
-    current_bsz <- get_buffer_size()
-    on.exit({
-        set_buffer_size(current_bsz)
-    })
-    set_buffer_size(buffer_sz)
-    
-    FARR_subset(
-        filebase = filebase,
-        type = x$sexp_type(),
+
+    FARR_subset2(
+        filebase = x$.filebase,
         listOrEnv = listOrEnv,
-        dim = dim,
-        cum_part_sizes = x$.partition_info[, 3],
         reshape = reshape,
         drop = drop,
-        strict = strict, 
-        split_dim = split_dim
+        use_dimnames = isTRUE(dimnames),
+        thread_buffer = max_buffer_size(), 
+        split_dim = split_dim,
+        strict = isTRUE(strict)
     )
+    
 }
 
 #' @describeIn S3-filearray assign array values
@@ -121,6 +115,11 @@ NULL
     if(isTRUE(x$.mode == 'readonly')){
         stop("File array is read-only")
     }
+    
+    buf_bytes <- get_buffer_size()
+    on.exit({
+        set_buffer_size(buf_bytes)
+    })
     
     # parse ...
     dim <- x$dimension()
@@ -198,8 +197,16 @@ NULL
     }
     
     # decide split_dim
-    buffer_sz <- max_buffer_size() / x$element_size()
+    buffer_sz <- buf_bytes / x$element_size()
     cprod <- cumprod(dim)
+    if(length(locs) == length(dim)){
+        tmp <- sapply(locs, function(x){
+            if(!length(x) || all(is.na(x))){ return(1L) }
+            rg <- range(x, na.rm = TRUE)
+            return(rg[2] - rg[1] + 1L)
+        })
+        cprod <- cprod / dim * tmp
+    }
     cprod <- cprod[-length(cprod)]
     if(all(cprod > buffer_sz)){
         split_dim <- 1
@@ -207,16 +214,23 @@ NULL
         split_dim <- max(which(cprod <= buffer_sz))
     }
     
-    filebase <- paste0(x$.filebase, x$.sep)
-    FARR_subset_assign(
-        filebase,
+    # filebase <- paste0(x$.filebase, x$.sep)
+    # FARR_subset_assign(
+    #     filebase,
+    #     listOrEnv = locs,
+    #     dim = x$dimension(),
+    #     cum_part_sizes = x$.partition_info[, 3],
+    #     split_dim = split_dim,
+    #     type = x$sexp_type(),
+    #     value_ = value
+    # )
+    FARR_subset_assign2(
+        filebase = x$.filebase, 
+        value = value,
         listOrEnv = locs,
-        dim = x$dimension(),
-        cum_part_sizes = x$.partition_info[, 3],
         split_dim = split_dim,
-        type = x$sexp_type(),
-        value_ = value
-    )
+        thread_buffer = buf_bytes
+    ) 
     invisible(x)
 }
 
@@ -257,6 +271,20 @@ as.array.FileArray <- function(x, reshape = NULL, drop = FALSE, ...){
 dim.FileArray <- function(x){
     x$dimension()
 }
+
+#' @describeIn S3-filearray get dimension names
+#' @export
+dimnames.FileArray <- function(x){
+    x$dimnames()
+}
+
+#' @describeIn S3-filearray set dimension names
+#' @export
+`dimnames<-.FileArray` <- function(x, value){
+    x$dimnames(value)
+    invisible(x)
+}
+
 
 #' @describeIn S3-filearray get array length
 #' @export
@@ -345,7 +373,45 @@ sum.FileArray <- function(x, na.rm = FALSE, ...){
     }
 }
 
-
+#' @describeIn S3-filearray get subset file array with formulae
+#' @export
+subset.FileArray <- function(x, ..., drop = FALSE){
+    if(...length() == 0){
+        stop("No filters to subset")
+    }
+    dnames <- dimnames(x)
+    nms <- names(dnames)
+    filters <- list(...)
+    criteria <- list()
+    for(ftr in filters){
+        if(!is.call(ftr)){
+            stop("All filters must be formula object, e.g `Var ~ Var < 10`")
+        }
+        name <- as.character(ftr[[2]])
+        if(!name %in% nms){
+            stop("Cannot find name `", name, "` in x")
+        }
+        expr <- ftr[[3]]
+        if(length(criteria[[name]])){
+            expr <- as.call(list(`&`, criteria[[name]], expr))
+        }
+        criteria[[name]] <- expr
+    }
+    dim <- dim(x)
+    locs <- lapply(seq_along(dim), function(ii){
+        if(ii > length(nms)){
+            return(seq_len(dim[[ii]]))
+        }
+        name <- nms[[ii]]
+        if(is.null(criteria[[name]])){
+            return(seq_len(dim[[ii]]))
+        }
+        with(dnames, {
+            eval(criteria[[name]])
+        })
+    })
+    do.call(`[`, c(list(x = quote(x), drop = drop), locs))
+}
 
 #' @title A generic function of \code{which} that is \code{'FileArray'} compatible
 #' @param x any R vector, matrix, array or file-array

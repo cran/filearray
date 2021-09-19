@@ -9,6 +9,7 @@
 #' \item{\code{create(filebase, dimension, type = "double", partition_size = 1)}}{Create a file array instance}
 #' \item{\code{delete(force = FALSE)}}{Remove array from local file system and reset}
 #' \item{\code{dimension()}}{Get dimension vector}
+#' \item{\code{dimnames(v)}}{Set/get dimension names}
 #' \item{\code{element_size()}}{Internal storage: bytes per element}
 #' \item{\code{fill_partition(part, value)}}{Fill a partition with given scalar}
 #' \item{\code{get_partition(part, reshape = NULL)}}{Get partition data, and reshape (if not null) to desired dimension}
@@ -34,8 +35,7 @@ initialize_filearray <- function(path, dimension, partition_size, type){
     on.exit({
         try({close(conn)}, silent = TRUE)
     })
-    size <- switch(type, double = 8L, integer = 4L, logical = 1L, raw = 1L,
-                  stop("Unknown data type: ",type))
+    size <- get_elem_size(type = type)
     write_header(conn, partition = partition_size, dimension = dimension, 
                  type = type, size = size)
     close(conn)
@@ -44,12 +44,34 @@ initialize_filearray <- function(path, dimension, partition_size, type){
 load_meta <- function(path){
     meta <- file.path(path, "meta")
     stopifnot(file.exists(meta))
-    validate_header(meta)
+    header <- validate_header(meta)
+    
+    if(header$content_length > 0){
+        # load dimnames
+        fid <- file(meta, "rb")
+        on.exit({ close(fid) })
+        seek(con = fid, where = HEADER_SIZE, origin = "start", rw = "read")
+        v <- readBin(con = fid, what = 'raw', size = 1L, 
+                     n = header$content_length)
+        conn <- rawConnection(v, open = "rb")
+        dimnames <- readRDS(conn)
+        close(conn)
+        header$dimnames <- dimnames
+    }
+    header
 }
 
 get_elem_size <- function(type){
-    switch(type, double = 8L, integer = 4L, logical = 1L, raw = 1L,
-                  stop("Unknown data type: ",type))
+    switch(
+        type,
+        double = 8L,
+        float = 4L,
+        integer = 4L,
+        logical = 1L,
+        raw = 1L,
+        complex = 8L,
+        stop("Unknown data type: ", type)
+    )
 }
 
 
@@ -102,6 +124,31 @@ setRefClass(
         dimension = function(){
             .self$.header$partition_dim
         },
+        dimnames = function(v){
+            if(!missing(v)){
+                dim <- .self$.header$partition_dim
+                stopifnot(is.list(v) || length(v) <= length(dim))
+                for(ii in seq_along(v)){
+                    if(length(v[[ii]]) != dim[[ii]]){
+                        stop("Dimension ", ii, " length mismatch")
+                    }
+                }
+                nms <- names(v)
+                if(!is.null(nms) && length(nms) < length(dim)){
+                    nms <- c(nms, rep("", length(dim) - length(nms)))
+                }
+                v <- structure(lapply(seq_along(dim), function(ii){
+                    if(ii > length(v)){ return(NULL) }
+                    v[[ii]]
+                }), names = nms)
+                # set dimnames
+                meta <- file.path(.self$.filebase, "meta")
+                set_meta_content(meta, v)
+                # header <- load_meta(.self$.filebase)
+                .self$.header$dimnames <- v
+            }
+            .self$.header$dimnames
+        },
         type = function(){
             sexp_to_type(.self$.header$sexp_type)
         },
@@ -139,7 +186,9 @@ setRefClass(
                 integer = NA_integer_,
                 logical = FALSE,
                 raw = as.raw(0),
-                stop("Unknown data type: ", type)
+                complex = NA_complex_,
+                float = NA_real_,
+                stop("Unknown data type: ", .self$type())
             )
             
             # load partition information
@@ -177,7 +226,15 @@ setRefClass(
             } else {
                 pinfo <- cbind(seq_len(nparts), partition_size)
             }
-            pinfo <- cbind(pinfo, cumsum(pinfo[,2]))
+            # need to make sure cumpart-size is correct
+            cpl <- cumsum(pinfo[,2])
+            nr <- sum(cpl <= margin)
+            if(cpl[[nr]] < margin){
+                nr <- nr + 1
+            }
+            cpl <- cpl[seq_len(nr)]
+            cpl[[nr]] <- margin
+            pinfo <- cbind(pinfo[seq_len(nr),,drop = FALSE], cpl)
             .self$.partition_info <- pinfo
             return(.self)
         },
@@ -189,6 +246,8 @@ setRefClass(
                     cat("Dimension:", paste(.self$dimension(), collapse = "x"), "\n")
                     cat("# of partitions:", nrow(.self$.partition_info), "\n")
                     cat("Partition size:", .self$partition_size(), "\n")
+                    cat("Storage type: ", .self$type(), " (internal size: ", get_elem_size(.self$type()), ")\n", sep = "")
+                    
                 }, error = function(e){
                     warning("Partition information is unavailable: might be broken or improperly set.", immediate. = FALSE)
                 })
@@ -279,8 +338,20 @@ setRefClass(
             }
             
             value <- value[[1]]
-            storage.mode(value) <- .self$type()
+            
             type <- .self$type()
+            switch (
+                type,
+                "complex" = {
+                    value <- cplxToReal2(as.complex(value))
+                },
+                "float" = {
+                    value <- realToFloat2(as.double(value))
+                },
+                {
+                    storage.mode(value) <- type
+                }
+            )
             size <- get_elem_size(type)
             file <- .self$partition_path(part)
             fid <- file(file, "wb")
@@ -373,6 +444,88 @@ setRefClass(
         },
         valid = function(){
             return(.self$.valid && dir.exists(.self$.filebase))
+        },
+        collapse = function(
+            keep, method = c('mean', 'sum'),
+            transform = c('asis', '10log10', 'square', 'sqrt', 'normalize'), 
+            na.rm = FALSE
+        ){
+            method <- match.arg(method)
+            transform <- match.arg(transform)
+            keep <- as.integer(keep)
+            dim <- .self$dimension()
+            if(any(is.na(keep)) || !all(keep %in% seq_along(dim))){
+                stop("`keep` must be valid margin numbers")
+            }
+            filebase <- paste0(.self$.filebase, .self$.sep)
+            
+            dim1 <- dim
+            transform1 <- which(c('asis', '10log10', 'square', 'sqrt', 'normalize') == transform)
+            if( method == "sum" ){
+                scale <- 1
+            } else {
+                scale <- 1/prod(dim[-keep])
+            }
+            # make sure last margin is the last one
+            dim <- .self$dimension()
+            ndims <- length(dim)
+            perm <- FALSE
+            keep1 <- keep
+            nkeeps <- length(keep)
+            if(nkeeps > 1 && 
+               ndims %in% keep && 
+               keep[[nkeeps]] != ndims)
+            {
+                keep_ldidx <- which(keep == ndims)
+                
+                keep_ord <- seq_along(keep)
+                keep_ord <- c(
+                    keep_ord[-seq.int(keep_ldidx, nkeeps)], 
+                    nkeeps,
+                    keep_ord[-seq.int(1, keep_ldidx)] - 1
+                )
+                
+                keep1 <- c(keep[-keep_ldidx], keep[keep_ldidx])
+                perm <- TRUE
+            }
+            
+            
+            expr <- quote(FARR_collapse(
+                filebase = filebase,
+                dim = dim1,
+                keep = keep1,
+                cum_part = .self$.partition_info[, 3],
+                remove_na = na.rm,
+                method = transform1,
+                scale = scale
+            ))
+            if(.self$type() == "complex"){
+                expr[[1]] <- quote(FARR_collapse_complex)
+            } else {
+                expr[["array_type"]] <- .self$sexp_type()
+            }
+                
+            re <- eval(expr)
+            
+            dnames <- .self$dimnames()
+            if(length(dnames) == length(dim)){
+                dnames <- structure(
+                    lapply(keep, function(d){ dnames[[keep]] }),
+                    names = names(dnames)[keep]
+                )
+                if(length(keep) == 1){
+                    re <- structure(re, names = dnames[[1]])
+                } else {
+                    re <- structure(re, dimnames = dnames)
+                }
+            }
+            
+            if(perm) {
+                re <- aperm(re, keep_ord)
+            }
+            
+            return(re)
+            
         }
     )
 )
