@@ -17,7 +17,15 @@
 \alias{subset.FileArray}
 \title{'S3' methods for 'FileArray'}
 \usage{
-\method{[}{FileArray}(x, ..., drop = TRUE, reshape = NULL, strict = TRUE, dimnames = TRUE)
+\method{[}{FileArray}(
+  x,
+  ...,
+  drop = TRUE,
+  reshape = NULL,
+  strict = TRUE,
+  dimnames = TRUE,
+  split_dim = 0
+)
 
 \method{[}{FileArray}(x, ...) <- value
 
@@ -53,6 +61,10 @@
 \item{strict}{whether to allow indices to exceed bound; currently only accept \code{TRUE}}
 
 \item{dimnames}{whether to preserve \code{\link[base]{dimnames}}}
+
+\item{split_dim}{internally used; split dimension and calculate indices to
+manually speed up the subset; value ranged from 0 to size of dimension minus
+one.}
 
 \item{value}{value to substitute or set}
 

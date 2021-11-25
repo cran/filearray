@@ -1,3 +1,10 @@
+
+print(Sys.getenv())
+
+# Testing collapse is time consuming, skip if ran
+skip_collapse <- Sys.getenv("FILEARRAY_SKIP_COLLAPSE", unset = "") == "TRUE"
+testthat::skip_if(skip_collapse)
+
 collapse_real <- function(y, keep, transform = c("asis", "10log10", "square", "sqrt", "normalize")){
     re <- switch (
         transform,
@@ -77,6 +84,7 @@ expect_equivalent_cplx <- function(x, y, eps = 1e-6){
 }
 
 test_that("R/C++ - Collapse", {
+    testthat::skip_on_cran()
     bsz <- get_buffer_size()
     on.exit({
         set_buffer_size(bsz)
@@ -90,7 +98,7 @@ test_that("R/C++ - Collapse", {
     set.seed(5)
     file <- tempfile()
     unlink(file, recursive = TRUE)
-    x <- filearray_create(file, dim, type = "integer", partition_size = 2)
+    x <- filearray_create(file, dim, type = "integer", partition_size = 2, initialize = FALSE)
     y <- array(1:(prod(dim)), dim)
     y[[20, 3, 3, 3]] <- NA
     storage.mode(y) <- "integer"
@@ -187,6 +195,7 @@ test_that("R/C++ - Collapse", {
 })
 
 test_that("R/C++ - Float", {
+    testthat::skip_on_cran()
     bsz <- get_buffer_size()
     on.exit({
         set_buffer_size(bsz)
@@ -200,7 +209,7 @@ test_that("R/C++ - Float", {
     set.seed(5)
     file <- tempfile()
     unlink(file, recursive = TRUE)
-    x <- filearray_create(file, dim, type = "float", partition_size = 2)
+    x <- filearray_create(file, dim, type = "float", partition_size = 2, initialize = FALSE)
     y <- array(rnorm(length(x))^2, dim)
     y[[20, 3, 3, 3]] <- NA
     x[] <- y
@@ -298,6 +307,7 @@ test_that("R/C++ - Float", {
 })
 
 test_that("R/C++ - Collapse (complex)", {
+    testthat::skip_on_cran()
     bsz <- get_buffer_size()
     on.exit({
         set_buffer_size(bsz)
@@ -311,7 +321,7 @@ test_that("R/C++ - Collapse (complex)", {
     set.seed(5)
     file <- tempfile()
     unlink(file, recursive = TRUE)
-    x <- filearray_create(file, dim, type = "complex", partition_size = 2)
+    x <- filearray_create(file, dim, type = "complex", partition_size = 2, initialize = FALSE)
     y <- array(rnorm(length(x)) + rnorm(length(x)) * 1i, dim)
     y[[20, 3, 3, 3]] <- NA
     x[] <- y
@@ -405,3 +415,6 @@ test_that("R/C++ - Collapse (complex)", {
     }
 
 })
+
+
+Sys.setenv("FILEARRAY_SKIP_COLLAPSE" = "TRUE")

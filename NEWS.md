@@ -1,3 +1,12 @@
+# filearray (development version)
+
+# filearray 0.1.2
+
+* Removed `flush` in saving data to let system decide when to flush to hard drive
+* Allowed array to expand along the partition margin
+* Fixed dimension name getting dropped under certain situations
+* Use 2 cores by default when `R CMD check` is detected
+
 # filearray 0.1.1
 
 * Added `OpenMP` flag in the `MakeVars`

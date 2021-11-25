@@ -162,64 +162,117 @@ SEXP check_missing_dots(const SEXP env){
     return(Rcpp::wrap(is_missing));
 }
 
-
 SEXP dropDimension(SEXP x){
+    
+    // Rf_DropDims mutates x, but since x is always internally created
+    // and won't be referenced
     // return(Rf_DropDims(x));
-    SEXP dim = Rf_getAttrib(x, R_DimSymbol);
-    if(dim == R_NilValue){
-        return x;
-    }
-    SEXP new_dim;
-    R_xlen_t ndims = Rf_xlength(dim);
-    R_xlen_t xlen = Rf_xlength(x);
-    if(ndims == 0){
-        new_dim = R_NilValue;
-        Rf_setAttrib(x, R_DimSymbol, new_dim);
-        return x;
-    }
-    if(xlen == 0){
+    
+    PROTECT(x);
+    SEXP dims = Rf_getAttrib(x, R_DimSymbol);
+    
+    if (dims == R_NilValue) {
+        UNPROTECT(1);
         return x;
     }
     
-    R_xlen_t ii;
+    int ndims = Rf_length(dims);
+    int *dim = INTEGER(dims); 
     
-    new_dim = PROTECT(Rf_allocVector(TYPEOF(dim), ndims));
-    
-    switch(TYPEOF(dim)){
-    case INTSXP: {
-        int *ptr_orig = INTEGER(dim);
-        int *ptr_new = INTEGER(new_dim);
-        for(ii = 0; ptr_orig != INTEGER(dim) + ndims; ptr_orig++ ){
-            if(*ptr_orig > 1){
-                *ptr_new++ = *ptr_orig;
-                ii++;
-            }
-        }
-        break;
+    int i, n = 0;
+    for (i = 0; i < ndims; i++) {
+        if (dim[i] != 1) n++;
     }
-    case REALSXP: {
-        double *ptr_orig = REAL(dim);
-        double *ptr_new = REAL(new_dim);
-        for(ii = 0; ptr_orig != REAL(dim) + ndims; ptr_orig++ ){
-            if(*ptr_orig > 1){
-                *ptr_new++ = *ptr_orig;
-                ii++;
-            }
-        }
-        break;
+    if (n == ndims) {
+        UNPROTECT(1);
+        return x;
     }
-    default:
-        stop("unknown dimension storage type");
-    }
-    if(ii == ndims){} else if(ii >= 2){
-        SETLENGTH(new_dim, ii);
         
-        Rf_setAttrib(x, R_DimSymbol, new_dim);
-    } else {
+    SEXP dimnames = PROTECT(Rf_getAttrib(x, R_DimNamesSymbol));
+    SEXP newnames = R_NilValue;
+    if (n <= 1) {
+        if (dimnames != R_NilValue) {
+            if(XLENGTH(x) != 1) {
+                for (i = 0; i < ndims; i++) {
+                    if (dim[i] != 1) {
+                        newnames = VECTOR_ELT(dimnames, i);
+                        break;
+                    }
+                }
+            } else { /* drop all dims: keep names if unambiguous */
+                int cnt = 0;
+                for(i = 0; i < ndims; i++) {
+                    if(VECTOR_ELT(dimnames, i) != R_NilValue) cnt++;
+                }
+                if(cnt == 1) {
+                    for (i = 0; i < ndims; i++) {
+                        newnames = VECTOR_ELT(dimnames, i);
+                        if(newnames != R_NilValue) break;
+                    }
+                }
+            }
+        }
+        PROTECT(newnames);
+        Rf_setAttrib(x, R_DimNamesSymbol, R_NilValue);
         Rf_setAttrib(x, R_DimSymbol, R_NilValue);
+        Rf_setAttrib(x, R_NamesSymbol, newnames);
+        UNPROTECT(1);
+    } else {
+        // We have a lower dimensional array, and  n == length(newdims)
+        SEXP newdims, dnn, newnamesnames = R_NilValue;
+        PROTECT(dnn = Rf_getAttrib(dimnames, R_NamesSymbol));
+        PROTECT(newdims = Rf_allocVector(INTSXP, n));
+        for (i = 0, n = 0; i < ndims; i++) {
+            if (dim[i] != 1) {
+                INTEGER(newdims)[n++] = dim[i];
+            }
+        }
+        
+        if(!Rf_isNull(Rf_getAttrib(dims, R_NamesSymbol))) {
+            SEXP new_nms = PROTECT(Rf_allocVector(STRSXP, n));
+            SEXP nms_d = Rf_getAttrib(dims, R_NamesSymbol);
+            for (i = 0, n = 0; i < ndims; i++) {
+                if (dim[i] != 1) {
+                    SET_STRING_ELT(new_nms, n++, STRING_ELT(nms_d, i));
+                }
+            }
+            Rf_setAttrib(newdims, R_NamesSymbol, new_nms);
+            UNPROTECT(1);
+        }
+        Rboolean havenames = FALSE;
+        if (!Rf_isNull(dimnames)) {
+            for (i = 0; i < ndims; i++) {
+                if (dim[i] != 1 && VECTOR_ELT(dimnames, i) != R_NilValue) {
+                    havenames = TRUE;
+                }
+            }
+            if (havenames) {
+                PROTECT(newnames = Rf_allocVector(VECSXP, n));
+                PROTECT(newnamesnames = Rf_allocVector(STRSXP, n));
+                for (i = 0, n = 0; i < ndims; i++) {
+                    if (dim[i] != 1) {
+                        if(!Rf_isNull(dnn)) {
+                            SET_STRING_ELT(newnamesnames, n, STRING_ELT(dnn, i));
+                        }
+                        SET_VECTOR_ELT(newnames, n++, VECTOR_ELT(dimnames, i));
+                    }
+                }
+            } else {
+                dimnames = R_NilValue;
+            }
+        }
+        Rf_setAttrib(x, R_DimNamesSymbol, R_NilValue);
+        Rf_setAttrib(x, R_DimSymbol, newdims);
+        if (havenames) {
+            if(!Rf_isNull(dnn)) {
+                Rf_setAttrib(newnames, R_NamesSymbol, newnamesnames);
+            }
+            Rf_setAttrib(x, R_DimNamesSymbol, newnames);
+            UNPROTECT(2);
+        }
+        UNPROTECT(2);
     }
-    
-    UNPROTECT(1);
+    UNPROTECT(2);
     return x;
 }
 

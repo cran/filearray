@@ -10,7 +10,9 @@ filearray_create(
   filebase,
   dimension,
   type = c("double", "float", "integer", "logical", "raw", "complex"),
-  partition_size = NA
+  partition_size = NA,
+  initialize = FALSE,
+  ...
 )
 
 filearray_load(filebase, mode = c("readwrite", "readonly"))
@@ -26,6 +28,12 @@ options include \code{'integer'}, \code{'logical'}, and \code{'raw'}.}
 
 \item{partition_size}{positive partition size for the last margin, or
 \code{NA} to automatically guess; see 'Details'.}
+
+\item{initialize}{whether to initialize partition files; default is false
+for performance considerations. However, if the array is dense, it is 
+recommended to set to true}
+
+\item{...}{ignored, reserved for future compatibility}
 
 \item{mode}{whether allows writing to the file; choices are 
 \code{'readwrite'} and \code{'readonly'}.}

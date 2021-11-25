@@ -1,7 +1,7 @@
 Package: filearray
 Type: Package
 Title: File-Backed Array for Out-of-Memory Computation
-Version: 0.1.1
+Version: 0.1.2
 Language: en-US
 Encoding: UTF-8
 License: LGPL-3
@@ -19,13 +19,13 @@ Description: Stores large arrays in files to avoid occupying large
     types (double, float, complex, integer, logical, and raw).
 Imports: methods, Rcpp
 Suggests: rmarkdown, knitr, testthat (>= 3.0.0)
-RoxygenNote: 7.1.1
+RoxygenNote: 7.1.2
 LinkingTo: BH, Rcpp
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 NeedsCompilation: yes
-Packaged: 2021-09-19 21:05:42 UTC; dipterix
+Packaged: 2021-11-25 02:34:35 UTC; dipterix
 Author: Zhengjia Wang [aut, cre, cph]
 Maintainer: Zhengjia Wang <dipterix.wang@gmail.com>
 Repository: CRAN
-Date/Publication: 2021-09-19 22:00:02 UTC
+Date/Publication: 2021-11-25 05:50:02 UTC
