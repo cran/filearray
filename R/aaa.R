@@ -4,7 +4,12 @@
 #' @importFrom methods setRefClass
 NULL
 HEADER_SIZE <- 1024
-FILE_VER <- c( 1L, 0L, 0L )
+FILE_VER <- c( 1L, 1L, 0L )
+HEADER_VER <- 1L
+RESERVED_HEADERS <- c("endianness", "version", "sexp_type", 
+                      "unit_bytes", "partition", "partition_size", 
+                      "partition_dim", "header_bytes", "header_version",
+                      "dimnames", "content_length")
 
 # The saved files are always little endian
 ENDIANNESS <- "little"
@@ -26,3 +31,34 @@ max_buffer_size <- local({
         return(size)
     }
 })
+
+quiet_warning <- function(..., call. = FALSE){
+    if(!getOption("filearray.quiet", FALSE)){
+        warning(..., '\n\n* To suppress this message, set `options("filearray.quiet" = TRUE)`', call. = call.)
+    }
+}
+
+get_os <- function(){
+    if("windows" %in% tolower(.Platform$OS.type)){
+        return("windows")
+    }
+    os <- tolower(R.version$os)
+    if(startsWith(os, "darwin")){
+        return('darwin')
+    }
+    if(startsWith(os, "linux")){
+        return('linux')
+    }
+    if(startsWith(os, "solaris")){
+        return('solaris')
+    }
+    if(startsWith(os, "win")){
+        return('windows')
+    }
+    return('unknown')
+}
+
+
+deparse1 <- function (expr, collapse = " ") {
+    paste(deparse(expr), collapse = collapse)
+}

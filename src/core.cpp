@@ -90,7 +90,52 @@ List FARR_meta(const std::string& filebase) {
     
     SEXP dimnames = R_NilValue;
     if( content_len2 > 0 ){
-        PROTECT(dimnames = unserialize_connection(conn, content_len2));
+        SEXP extra_headers = PROTECT(unserialize_connection(conn, content_len2));
+        if(TYPEOF(extra_headers) == VECSXP){
+            
+            // extra_headers is protected
+            SEXP extra_names = PROTECT(Rf_getAttrib(extra_headers, R_NamesSymbol));
+            R_xlen_t extra_length = Rf_xlength(extra_names);
+            
+            if(extra_length){
+                double header_version = 0.0;
+                const char* st = "";
+                const char* hv_name = "__header_version__";
+                const char* dn_name = "__dimnames__";
+                for (R_xlen_t i = 0 ; i < extra_length ; i = i + 1) {
+                    SEXP target = STRING_ELT(extra_names, i);
+                    switch (TYPEOF(target)) {
+                    case SYMSXP:
+                        st = CHAR(PRINTNAME(target));
+                        break;
+                    case CHARSXP:
+                        st = Rf_translateChar(target);
+                        break;
+                    }
+                    if(strncmp(st, hv_name, 19) == 0){
+                        target = VECTOR_ELT(extra_headers, i);
+                        switch (TYPEOF(target)) {
+                        case REALSXP:
+                            header_version = REAL(target)[0];
+                            break;
+                        case INTSXP:
+                            header_version = (double)(INTEGER(target)[0]);
+                            break;
+                        }
+                    } else if (strncmp(st, dn_name, 13) == 0) {
+                        dimnames = VECTOR_ELT(extra_headers, i);
+                    }
+                }
+                if(header_version < 1.0){
+                    // extra_headers itself is the dimnames
+                    dimnames = extra_headers;
+                }
+            }
+            
+            // extra_names
+            UNPROTECT(1);
+            
+        }
     }
     fclose(conn);
     conn = NULL;
@@ -153,6 +198,7 @@ List FARR_meta(const std::string& filebase) {
         _["cumsum_part_sizes"] = cum_part_size,
         _["dimnames"] = dimnames
     );
+    
     UNPROTECT(3 + (content_len2 > 0));
     
     return re;
