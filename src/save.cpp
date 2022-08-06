@@ -193,14 +193,25 @@ void subset_assign_partition(
         // load current block
         buf = (T*)(conn0 + start_loc * elem_size);
         
+        // Rcout << "### idx2ii:" << idx2ii << ", start_loc: " << start_loc << 
+        //     ", buf pos: " << start_loc * elem_size << ", idx1_start: " <<
+        //         idx1_start << "\n";
+        // block_size: 861584, idx1len: 9001, idx1_start: 216024, idx2_start: 0, idx2_len: 1
+        // ### idx2ii:0, start_loc: 0, buf pos: 0, idx1_start: 216024
+        
         for(idx1ii = 0; idx1ii < idx1len; idx1ii++, idx1ptr++, valptr2++){
             // calculate pointer location in the file
             // no check here, but tmp_loc should be >=0
+            
+            // Rcout << "idx1ii: " << idx1ii << ", *idx1ptr: " << *idx1ptr << ", idx1_start: " << idx1_start << 
+            //     ", *valptr2: " << *valptr2 << ", buf_new: " << *(buf + (*idx1ptr - idx1_start)) << "\n";
+            // *idx1ptr: 225024, idx1_start: 216024, *valptr2: 147
+
             if(*idx1ptr != NA_INTEGER64){
                 // *(buf + (*idx1ptr - idx1_start)) = (*valptr2);
                 
-                lendian_assign(buf + (*idx1ptr - idx1_start),
-                               valptr2, elem_size);
+                // lendian_assign(void* dst, const void* src, const size_t& elem_size, const size_t& nelems)
+                lendian_assign(buf + (*idx1ptr - idx1_start), valptr2, elem_size, 1);
             }
         }
         
@@ -230,7 +241,7 @@ SEXP FARR_subset_assign_template(
     int64_t* idx1rangeptr = (int64_t*) REAL(idx1range);
     int64_t idx1_start = *idx1rangeptr, idx1_end = *(idx1rangeptr + 1);
     
-    if( idx1_start == NA_INTEGER64 || idx1_end == idx1_start ||
+    if( idx1_start == NA_INTEGER64 || idx1_end < idx1_start ||
         idx1_end < 0 || idx1_start < 0 ){
         return( R_NilValue );
     }
@@ -244,30 +255,30 @@ SEXP FARR_subset_assign_template(
     int64_t* idx1ptr0 = (int64_t*) REAL(idx1);
     const boost::interprocess::mode_t mode = boost::interprocess::read_write;
     
-    std::map<int64_t, boost::interprocess::file_mapping*> conn_map;
-    std::map<int64_t, bool> conn_exist;
-    
-    std::map<int64_t, bool>::iterator it2;
-    
-    // it = conn_map.find(part);
-    for(IntegerVector::iterator partptr = partitions.begin();
-        partptr != partitions.end(); partptr++){
-        it2 = conn_exist.find(*partptr);
-        if(it2 == conn_exist.end()){
-            try {
-                std::string file = filebase + std::to_string(*partptr) + ".farr";
-                boost::interprocess::file_mapping *fm = new boost::interprocess::file_mapping(file.c_str(), mode);
-                conn_map.insert( std::pair<int64_t, boost::interprocess::file_mapping*>(*partptr, fm) );
-                conn_exist.insert( std::pair<int64_t, bool>(*partptr, true) );
-            } catch (...){
-                conn_exist.insert( std::pair<int64_t, bool>(*partptr, false) );
-            }
-        }
-    }
+    // std::map<int64_t, boost::interprocess::file_mapping*> conn_map;
+    // std::map<int64_t, bool> conn_exist;
+    // 
+    // std::map<int64_t, bool>::iterator it2;
+    // 
+    // // it = conn_map.find(part);
+    // for(IntegerVector::iterator partptr = partitions.begin();
+    //     partptr != partitions.end(); partptr++){
+    //     it2 = conn_exist.find(*partptr);
+    //     if(it2 == conn_exist.end()){
+    //         try {
+    //             std::string file = filebase + std::to_string(*partptr) + ".farr";
+    //             boost::interprocess::file_mapping *fm = new boost::interprocess::file_mapping(file.c_str(), mode);
+    //             conn_map.insert( std::pair<int64_t, boost::interprocess::file_mapping*>(*partptr, fm) );
+    //             conn_exist.insert( std::pair<int64_t, bool>(*partptr, true) );
+    //         } catch (...){
+    //             conn_exist.insert( std::pair<int64_t, bool>(*partptr, false) );
+    //         }
+    //     }
+    // }
     
 #pragma omp parallel num_threads(ncores)
 {
-#pragma omp for schedule(static, 1) nowait
+    #pragma omp for schedule(static, 1) nowait
     for(R_xlen_t iter = 0; iter < idx2s.length(); iter++){
         
         if( has_error >= 0 ){ continue; }
@@ -277,6 +288,8 @@ SEXP FARR_subset_assign_template(
         if(iter > 0){
             skips = idx2lens[iter - 1];
         }
+        
+        // Rcout << part << ", skip=" << skips << "\n";
         
         // obtain starting end ending indices of idx2
         SEXP idx2 = idx2s[iter];
@@ -300,21 +313,50 @@ SEXP FARR_subset_assign_template(
             continue;
         }
         
+        // Rcout << "idx start-end: " << idx2_start << " - " << idx2_end << "\n";
+        
         std::string file = filebase + std::to_string(part) + ".farr";
+        // Rcpp::print(Rcpp::wrap(file));
+        
+        
         
         try{
-            std::map<int64_t, boost::interprocess::file_mapping*>::const_iterator it = conn_map.find(part);
+            /*
+             * On most OS, there is a limit on how many descriptors that open
+             * simultaneously:
+             * (OSX) launchctl limit maxfiles
+             * 
+             * Besides, the closed file descriptor will be reused quickly on 
+             * many Unix systems
+             * 
+             * https://docs.fedoraproject.org/en-US/Fedora_Security_Team/1/html/Defensive_Coding/sect-Defensive_Coding-Tasks-Descriptors.html
+             * 
+             * Unlike process IDs, which are recycle only gradually, the kernel 
+             * always allocates the lowest unused file descriptor when a new 
+             * descriptor is created. This means that in a multi-threaded 
+             * program which constantly opens and closes file descriptors, 
+             * descriptors are reused very quickly. Unless descriptor closing 
+             * and other operations on the same file descriptor are synchronized 
+             * (typically, using a mutex), there will be race coniditons and 
+             * I/O operations will be applied to the wrong file descriptor. 
+             * 
+             * https://stackoverflow.com/questions/52087692/can-multiple-file-objects-share-the-same-file-descriptor
+             */
+            boost::interprocess::file_mapping fm(file.c_str(), mode);
+            // std::map<int64_t, boost::interprocess::file_mapping*>::const_iterator it = conn_map.find(part);
+            // 
+            // if(it == conn_map.end()){
+            //     has_error = part;
+            //     error_msg = "Cannot open partition " + std::to_string(part + 1);
+            //     continue;
+            // }
             
-            if(it == conn_map.end()){
-                has_error = part;
-                error_msg = "Cannot open partition " + std::to_string(part + 1);
-                continue;
-            }
-            
-            int64_t region_len = elem_size * (idx1_end - idx1_start + block_size * (idx2_end - idx2_start));
+            int64_t region_len = elem_size * (idx1_end - idx1_start + 1 + block_size * (idx2_end - idx2_start));
             int64_t region_offset = FARR_HEADER_LENGTH + elem_size * (block_size * idx2_start + idx1_start);
+            // boost::interprocess::mapped_region region(
+            //         *(it->second), mode, region_offset, region_len);
             boost::interprocess::mapped_region region(
-                    *(it->second), mode, region_offset, region_len);
+                    fm, mode, region_offset, region_len);
             region.advise(boost::interprocess::mapped_region::advice_sequential);
             
             char* begin = static_cast<char*>(region.get_address());
@@ -323,11 +365,16 @@ SEXP FARR_subset_assign_template(
             R_xlen_t idx2_len = Rf_xlength(idx2);
             T* value_ptr2 = value_ptr + (idx1len * skips);
             int64_t* idx1ptr = idx1ptr0;
+            
+            // Rcout << "block_size: " << block_size << ", idx1len: " << idx1len << ", idx1_start: " << idx1_start << 
+            //     ", idx2_start: " << idx2_start << ", idx2_len: " << idx2_len << "\n";
+            
             subset_assign_partition(
                 begin, value_ptr2,
                 block_size, idx1ptr, idx1len, 
                 idx1_start, idx2_start, 
                 idx2_ptr, idx2_len );
+            
             
             // region.flush();
         } catch(std::exception &ex){
@@ -341,10 +388,10 @@ SEXP FARR_subset_assign_template(
     }
 }
 
-    std::map<int64_t, boost::interprocess::file_mapping*>::iterator it1 = conn_map.begin();
-    for(; it1 != conn_map.end(); it1++){
-        delete it1->second;
-    }
+    // std::map<int64_t, boost::interprocess::file_mapping*>::iterator it1 = conn_map.begin();
+    // for(; it1 != conn_map.end(); it1++){
+    //     delete it1->second;
+    // }
 
     // UNPROTECT(ncores);
     if( has_error >= 0 ){
@@ -384,6 +431,8 @@ SEXP FARR_subset_assign2(
     // schedule indices
     List sch = schedule(listOrEnv, dim, cum_part_size,
                         split_dim, 1);
+    
+    // Rcpp::print(sch);
     
     // Check whether indices are valid
     SEXP idx1range = sch["idx1range"];
