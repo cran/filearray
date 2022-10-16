@@ -1,6 +1,6 @@
-8133db9c5cc3cec219b64b23048dead4 *DESCRIPTION
+ebe0961ad838f75c61aa5c55323b75cc *DESCRIPTION
 5bfe70b660884379672c90dfd4cb84e2 *NAMESPACE
-6ca630b75933767da083d4b3f7c9e4ac *NEWS.md
+b3d7f97fa4d141f0e225219ca0b2d8fc *NEWS.md
 10af77b73256a5a7b80f5f640f572153 *R/RcppExports.R
 8da820915e51b6889ba63050476566ae *R/aaa.R
 646951b73baa705dec2c66c0e8cd8c0d *R/bind.R
@@ -19,7 +19,7 @@ df0e4bd145868d9b3b7d4be76c95409d *build/vignette.rds
 cfc7ef6e68347998786e8f05b3abc8f5 *inst/WORDLIST
 d1c4cae116ac64987880ade2e187a1b4 *inst/doc/performance.R
 65abae5c69d80fa826a2a9d56a22f89c *inst/doc/performance.Rmd
-e8b317cddac872d21066b9b8e18f2d14 *inst/doc/performance.html
+28d972acb3a3414f9f77a7279ada9845 *inst/doc/performance.html
 e79fceb3693bffaf9070ac49b94bdc8d *man/FileArray-class.Rd
 b4d131870e5744948bfad914b6835358 *man/S3-filearray.Rd
 b66e1513daac2c2b4a38f38f6610b9c1 *man/apply.Rd
@@ -40,13 +40,13 @@ eae2bc61f00f7323c045faf30174af3a *src/core.cpp
 7bf7257b4d77f2d9426299f1b15c16b5 *src/core.h
 e9539788dd75431b324350e28d826c5c *src/defs.h
 ffc54d3ace8c108cac4c6c04c0a08ffb *src/interfaces.cpp
-c637694d28557587e894e5580ada1ec6 *src/load.cpp
+e2f225686fe9dd8fddb9688af869eb87 *src/load.cpp
 027b748e42c25375a32b4b2f87efaa06 *src/load.h
-9bc2c305404c91b0b3515b2985912975 *src/map.cpp
+19d4e077ed5b81450b0bb39cd843fea0 *src/map.cpp
 794b33046990749ca74d2add091833fb *src/mapreduce.cpp
 8a7155acb341400e0c822b6675506f97 *src/openmp.cpp
 1501e23f454358744bc62bad49a5dc37 *src/openmp.h
-db3efeef5f106ea2d5517341f467f65f *src/save.cpp
+00bab3785ef89bb9ccd24b079cdbe158 *src/save.cpp
 6103d2575e9441013bb72c31b4bebe0a *src/save.h
 f43c71c16801da92400a258f5a12bdd8 *src/serialize.cpp
 82f6f682a8c3fe080ce973890f4594d8 *src/serialize.h
