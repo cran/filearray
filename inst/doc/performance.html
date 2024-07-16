@@ -622,20 +622,20 @@ still faster than native R, and is more memory-efficient.</p>
 <span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>  <span class="at">farr_double =</span> { x_dbl<span class="sc">$</span><span class="fu">collapse</span>(<span class="at">keep =</span> keep, <span class="at">method =</span> <span class="st">&quot;sum&quot;</span>) },</span>
 <span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>  <span class="at">farr_float =</span> { x_flt<span class="sc">$</span><span class="fu">collapse</span>(<span class="at">keep =</span> keep, <span class="at">method =</span> <span class="st">&quot;sum&quot;</span>) },</span>
 <span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>  <span class="at">native =</span> { <span class="fu">apply</span>(y, keep, sum) },</span>
-<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>  <span class="at">dipsaus =</span> { dipsaus<span class="sc">::</span><span class="fu">collapse</span>(y, keep, <span class="at">average =</span> <span class="cn">FALSE</span>) },</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>  <span class="at">ravetools =</span> { ravetools<span class="sc">::</span><span class="fu">collapse</span>(y, keep, <span class="at">average =</span> <span class="cn">FALSE</span>) },</span>
 <span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>  <span class="at">unit =</span> <span class="st">&quot;s&quot;</span>, <span class="at">times =</span> <span class="dv">5</span></span>
 <span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>)</span>
 <span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a></span>
 <span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a><span class="co">#&gt; Unit: seconds</span></span>
 <span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a><span class="co">#&gt;         expr   min    lq  mean median    uq   max neval</span></span>
-<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a><span class="co">#&gt;  farr_double 0.782 0.790 1.009  0.799 0.832 1.840     5</span></span>
-<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a><span class="co">#&gt;   farr_float 0.765 0.779 0.929  0.930 1.043 1.127     5</span></span>
-<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a><span class="co">#&gt;       native 0.964 1.174 1.222  1.213 1.370 1.390     5</span></span>
-<span id="cb11-17"><a href="#cb11-17" tabindex="-1"></a><span class="co">#&gt;      dipsaus 0.185 0.190 0.202  0.199 0.203 0.233     5</span></span></code></pre></div>
-<p>The <code>dipsaus</code> package uses multiple threads to collapse
+<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a><span class="co">#&gt;  farr_double 0.651 0.666 0.867  0.716 0.718 1.583     5</span></span>
+<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a><span class="co">#&gt;   farr_float 0.628 0.637 0.737  0.642 0.652 1.124     5</span></span>
+<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a><span class="co">#&gt;       native 1.011 1.029 1.128  1.078 1.207 1.316     5</span></span>
+<span id="cb11-17"><a href="#cb11-17" tabindex="-1"></a><span class="co">#&gt;    ravetools 0.109 0.110 0.126  0.131 0.138 0.139     5</span></span></code></pre></div>
+<p>The <code>ravetools</code> package uses multiple threads to collapse
 arrays in-memory. It is <code>7~8x</code> as fast as base R. File array
-is <code>1~2x</code> as fast as base R. Both <code>dipsaus</code> and
-<code>filearray</code> have little memory over-heads.</p>
+is <code>1.5~2x</code> as fast as base R. Both <code>ravetools</code>
+and <code>filearray</code> have little memory over-heads.</p>
 </div>
 
 
