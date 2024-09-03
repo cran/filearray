@@ -1,7 +1,7 @@
 Package: filearray
 Type: Package
 Title: File-Backed Array for Out-of-Memory Computation
-Version: 0.1.7
+Version: 0.1.8
 Language: en-US
 Encoding: UTF-8
 License: LGPL-3
@@ -24,8 +24,8 @@ LinkingTo: BH, Rcpp
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 NeedsCompilation: yes
-Packaged: 2024-07-16 20:13:55 UTC; dipterix
+Packaged: 2024-09-03 17:52:17 UTC; dipterix
 Author: Zhengjia Wang [aut, cre, cph]
 Maintainer: Zhengjia Wang <dipterix.wang@gmail.com>
 Repository: CRAN
-Date/Publication: 2024-07-16 22:40:05 UTC
+Date/Publication: 2024-09-03 18:20:02 UTC

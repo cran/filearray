@@ -1,6 +1,6 @@
-d8f8c7bfd826415bb81732345c4672f4 *DESCRIPTION
+cd50ff8f84c3cc3d39a909a8f6708dcf *DESCRIPTION
 f9295aec8ce3e6522ef23f51b0ea4d1d *NAMESPACE
-caa3f85ed5f31b5c941176e7784b91fd *NEWS.md
+d1eda4d1fa958483ef51d8dbe0155450 *NEWS.md
 5713140a82dd65fc5de896a55832eb2f *R/RcppExports.R
 18ad406cca897d32a65b388dee672ad6 *R/aaa-docs.R
 0cf269d9e62f480d69f4b5749cbb73d4 *R/aaa.R
@@ -26,7 +26,7 @@ cabeac8d943159812a8f57bb798c1871 *R/methods.R
 a8b8752ca452dd981a60d0f6737d69e7 *R/misc-docs.R
 0c9b4412efcdf3079b8bc29b55449bf4 *R/todo-list.R
 5cb5399b41c26088e3194f6e5f3b43e6 *R/write.R
-4b7e0f99aa9005c7b45128b7ab0ec140 *build/vignette.rds
+e578e17aea75f68c5e10ccdea3d085d7 *build/vignette.rds
 cfc7ef6e68347998786e8f05b3abc8f5 *inst/WORDLIST
 3cbae48ef06a685295528a1b5caa1bf5 *inst/doc/performance.R
 da8276bb63949917c1c37ccccc4b3dd9 *inst/doc/performance.Rmd
@@ -59,10 +59,10 @@ be41cb07dea71a12bccc265a0321deb1 *src/core.cpp
 7bf7257b4d77f2d9426299f1b15c16b5 *src/core.h
 e9539788dd75431b324350e28d826c5c *src/defs.h
 ffc54d3ace8c108cac4c6c04c0a08ffb *src/interfaces.cpp
-74edd8ff77add5d0c0ccf9bd338823d1 *src/load.cpp
+fec412a1f79ce337ff01eeca0b12d28d *src/load.cpp
 027b748e42c25375a32b4b2f87efaa06 *src/load.h
 296ff9079a07644b09c633d309eecacd *src/map.cpp
-5d3eab844149813b17695339bee76974 *src/mapreduce.cpp
+c7bededa3dc3b263d55d81d6b0afa31d *src/mapreduce.cpp
 f3ebb848d30e87c7d502f4969577fdef *src/save.cpp
 6103d2575e9441013bb72c31b4bebe0a *src/save.h
 15e184ae6fc4174186a333447c3e75b6 *src/serialize.cpp
