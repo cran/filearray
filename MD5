@@ -1,6 +1,6 @@
-cd50ff8f84c3cc3d39a909a8f6708dcf *DESCRIPTION
+f6ad3e7cd32caca74ff638268724b2cb *DESCRIPTION
 f9295aec8ce3e6522ef23f51b0ea4d1d *NAMESPACE
-d1eda4d1fa958483ef51d8dbe0155450 *NEWS.md
+05369dc343d0d1cbd3c3de2f889016a8 *NEWS.md
 5713140a82dd65fc5de896a55832eb2f *R/RcppExports.R
 18ad406cca897d32a65b388dee672ad6 *R/aaa-docs.R
 0cf269d9e62f480d69f4b5749cbb73d4 *R/aaa.R
@@ -30,7 +30,7 @@ e578e17aea75f68c5e10ccdea3d085d7 *build/vignette.rds
 cfc7ef6e68347998786e8f05b3abc8f5 *inst/WORDLIST
 3cbae48ef06a685295528a1b5caa1bf5 *inst/doc/performance.R
 da8276bb63949917c1c37ccccc4b3dd9 *inst/doc/performance.Rmd
-c48b455944bcd05e46c9c74d2f6e8b3c *inst/doc/performance.html
+3d320f7b0505c666ffc51b978bb81bb5 *inst/doc/performance.html
 ccba5508d80c39831dc19dde7eea49b0 *inst/include/TinyParallel.h
 801a3353a599407e9a03c3a49e73e40b *inst/include/TinyParallel/Common.h
 e223a4edd09c81614f62075a843d6842 *inst/include/TinyParallel/Timer.h
@@ -75,7 +75,7 @@ a7798fdede80b9a6244551c3ad5b65b3 *tests/testthat.R
 02f6a2b5434f9d5509573a72f07f47c5 *tests/testthat/test-as_filearray.R
 b1b013ceae63ddb2953e137cbb9e3191 *tests/testthat/test-bind.R
 61e232a875dce2aa4c3f1082b2ff663f *tests/testthat/test-collapse.R
-baa90ceae0d65d727502e656689d111b *tests/testthat/test-cpp.R
+220ea703e510f756a6890158793b50fc *tests/testthat/test-cpp.R
 3d69a04c437c53add7d8a0ea47a06517 *tests/testthat/test-dimnames.R
 f57fa82f26a5271e0eca4fb621a49bc2 *tests/testthat/test-helpers.R
 f5ab1444195a8a948ec0ef2e178fbdbd *tests/testthat/test-map.R
