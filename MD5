@@ -1,6 +1,6 @@
-f6ad3e7cd32caca74ff638268724b2cb *DESCRIPTION
+ce0dad4ff8019a05f3e0b9e583f38710 *DESCRIPTION
 f9295aec8ce3e6522ef23f51b0ea4d1d *NAMESPACE
-05369dc343d0d1cbd3c3de2f889016a8 *NEWS.md
+32077e1f7398d1025da9e81f1c2e3874 *NEWS.md
 5713140a82dd65fc5de896a55832eb2f *R/RcppExports.R
 18ad406cca897d32a65b388dee672ad6 *R/aaa-docs.R
 0cf269d9e62f480d69f4b5749cbb73d4 *R/aaa.R
@@ -11,7 +11,7 @@ acf5658d15199886a68c2b71d4b75e9c *R/class-filearray.R
 8f9fbf1ab4d495d6c18e4213e10c531b *R/header.R
 3c094d4b125000236f0e7ff119dd8f32 *R/helpers.R
 ef1b6493846866477b37ca898bed357a *R/internal_misc.R
-0c4be3e877444517955dc0c7879506ea *R/load.R
+0843972a6b052b89b83951aba05caa7e *R/load.R
 d41d8cd98f00b204e9800998ecf8427e *R/lock.R
 6b51effc029aca93d2f841baf0ea549a *R/mapreduce.R
 74e4d42648d5fbddd02eb89b6c08c65b *R/method-map.R
@@ -26,11 +26,11 @@ cabeac8d943159812a8f57bb798c1871 *R/methods.R
 a8b8752ca452dd981a60d0f6737d69e7 *R/misc-docs.R
 0c9b4412efcdf3079b8bc29b55449bf4 *R/todo-list.R
 5cb5399b41c26088e3194f6e5f3b43e6 *R/write.R
-e578e17aea75f68c5e10ccdea3d085d7 *build/vignette.rds
+511d13f649f3273b9ff6f1d0c6875528 *build/vignette.rds
 cfc7ef6e68347998786e8f05b3abc8f5 *inst/WORDLIST
-3cbae48ef06a685295528a1b5caa1bf5 *inst/doc/performance.R
-da8276bb63949917c1c37ccccc4b3dd9 *inst/doc/performance.Rmd
-3d320f7b0505c666ffc51b978bb81bb5 *inst/doc/performance.html
+e104d57cd550344cf6aa32e4bb16cc88 *inst/doc/performance.R
+8b22752f3f3b7419cf23dde8046467cd *inst/doc/performance.Rmd
+3ec467663f91b2575220f0be9947303b *inst/doc/performance.html
 ccba5508d80c39831dc19dde7eea49b0 *inst/include/TinyParallel.h
 801a3353a599407e9a03c3a49e73e40b *inst/include/TinyParallel/Common.h
 e223a4edd09c81614f62075a843d6842 *inst/include/TinyParallel/Timer.h
@@ -42,7 +42,7 @@ e223a4edd09c81614f62075a843d6842 *inst/include/TinyParallel/Timer.h
 da422babad8dee2f806489a083cb546b *man/S3-filearray.Rd
 a7339a5317731d09839edf623a7fd401 *man/S4-filearray.Rd
 d683d410c1d1f9c330bb919b77c889f1 *man/apply.Rd
-c222365c87b89f62dfaebd2df520cfb8 *man/filearray.Rd
+be027610a4a422ecd7ec764b57d50f55 *man/filearray.Rd
 27eb5efee1f723e3a3dfcb68b330df2c *man/filearray_bind.Rd
 a5556b1ae626c28304ca79446ed7f605 *man/filearray_threads.Rd
 a392f0d84e780f95e1be85ced0d351af *man/fmap.Rd
@@ -79,10 +79,10 @@ b1b013ceae63ddb2953e137cbb9e3191 *tests/testthat/test-bind.R
 3d69a04c437c53add7d8a0ea47a06517 *tests/testthat/test-dimnames.R
 f57fa82f26a5271e0eca4fb621a49bc2 *tests/testthat/test-helpers.R
 f5ab1444195a8a948ec0ef2e178fbdbd *tests/testthat/test-map.R
-36d08b6298704d04f07e19e1b5c0c4c4 *tests/testthat/test-method_add.R
-fbd2cd06cc99cc96dbcb170f2a50f4d8 *tests/testthat/test-method_sub.R
+9846a0897ffe186ec042b1527d323459 *tests/testthat/test-method_add.R
+159ee3db59b46b01fa05694443c9d874 *tests/testthat/test-method_sub.R
 ddad440d8adc16fbe03f382b15bfa62b *tests/testthat/test-method_subset.R
 9c998cfb4f21d70f4af7eaeb75882029 *tests/testthat/test-method_subsetAssign.R
 7b3cffb7b4b5f43cb34a2dc6c0cf8a6a *tests/testthat/test-methods.R
 2c62ffef3b55bc6cb27c51e401abf86b *tests/testthat/test-methods_simple.R
-da8276bb63949917c1c37ccccc4b3dd9 *vignettes/performance.Rmd
+8b22752f3f3b7419cf23dde8046467cd *vignettes/performance.Rmd

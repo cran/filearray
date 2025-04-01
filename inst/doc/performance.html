@@ -370,16 +370,18 @@ hard disk, <code>float</code> array only uses half size
 <span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a></span>
 <span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="co"># Create file array and initialize partitions</span></span>
 <span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">1</span>)</span>
-<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>file <span class="ot">&lt;-</span> <span class="fu">tempfile</span>(); <span class="fu">unlink</span>(file, <span class="at">recursive =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>x_dbl <span class="ot">&lt;-</span> <span class="fu">filearray_create</span>(file, <span class="fu">rep</span>(<span class="dv">100</span>, <span class="dv">4</span>))</span>
-<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>x_dbl<span class="sc">$</span><span class="fu">initialize_partition</span>()</span>
-<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a></span>
-<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a>file <span class="ot">&lt;-</span> <span class="fu">tempfile</span>(); <span class="fu">unlink</span>(file, <span class="at">recursive =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a>x_flt <span class="ot">&lt;-</span> <span class="fu">filearray_create</span>(file, <span class="fu">rep</span>(<span class="dv">100</span>, <span class="dv">4</span>), <span class="at">type =</span> <span class="st">&#39;float&#39;</span>)</span>
-<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a>x_flt<span class="sc">$</span><span class="fu">initialize_partition</span>()</span>
-<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a></span>
-<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a><span class="co"># 800 MB double array</span></span>
-<span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a>y <span class="ot">&lt;-</span> <span class="fu">array</span>(<span class="fu">rnorm</span>(<span class="fu">length</span>(x_dbl)), <span class="fu">dim</span>(x_dbl))</span></code></pre></div>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>file <span class="ot">&lt;-</span> <span class="fu">tempfile</span>()</span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a><span class="fu">unlink</span>(file, <span class="at">recursive =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>x_dbl <span class="ot">&lt;-</span> <span class="fu">filearray_create</span>(file, <span class="fu">rep</span>(<span class="dv">100</span>, <span class="dv">4</span>))</span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>x_dbl<span class="sc">$</span><span class="fu">initialize_partition</span>()</span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a>file <span class="ot">&lt;-</span> <span class="fu">tempfile</span>()</span>
+<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a><span class="fu">unlink</span>(file, <span class="at">recursive =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a>x_flt <span class="ot">&lt;-</span> <span class="fu">filearray_create</span>(file, <span class="fu">rep</span>(<span class="dv">100</span>, <span class="dv">4</span>), <span class="at">type =</span> <span class="st">&#39;float&#39;</span>)</span>
+<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a>x_flt<span class="sc">$</span><span class="fu">initialize_partition</span>()</span>
+<span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a></span>
+<span id="cb1-19"><a href="#cb1-19" tabindex="-1"></a><span class="co"># 800 MB double array</span></span>
+<span id="cb1-20"><a href="#cb1-20" tabindex="-1"></a>y <span class="ot">&lt;-</span> <span class="fu">array</span>(<span class="fu">rnorm</span>(<span class="fu">length</span>(x_dbl)), <span class="fu">dim</span>(x_dbl))</span></code></pre></div>
 </div>
 <div id="simulation" class="section level2">
 <h2>Simulation</h2>
