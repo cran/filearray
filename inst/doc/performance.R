@@ -21,7 +21,7 @@ knitr::opts_chunk$set(
 # 
 # file <- tempfile()
 # unlink(file, recursive = TRUE)
-# x_flt <- filearray_create(file, rep(100, 4), type = 'float')
+# x_flt <- filearray_create(file, rep(100, 4), type = "float")
 # x_flt$initialize_partition()
 # 
 # # 800 MB double array
@@ -29,16 +29,18 @@ knitr::opts_chunk$set(
 
 ## ----eval = FALSE-------------------------------------------------------------
 # microbenchmark::microbenchmark(
-#   double = {
-#     for(i in 1:100){
-#       x_dbl[,,,i] <- y[,,,i]
-#     }
-#   },
-#   float = {
-#     for(i in 1:100){
-#       x_flt[,,,i] <- y[,,,i]
-#     }
-#   }, unit = 's', times = 3
+#     double = {
+#         for (i in 1:100) {
+#             x_dbl[, , , i] <- y[, , , i]
+#         }
+#     },
+#     float = {
+#         for (i in 1:100) {
+#             x_flt[, , , i] <- y[, , , i]
+#         }
+#     },
+#     unit = "s",
+#     times = 3
 # )
 # 
 # #> Unit: seconds
@@ -48,16 +50,18 @@ knitr::opts_chunk$set(
 
 ## ----eval = FALSE-------------------------------------------------------------
 # microbenchmark::microbenchmark(
-#   double = {
-#     for(i in 1:100){
-#       x_dbl[,,i,] <- y[,,i,]
-#     }
-#   },
-#   float = {
-#     for(i in 1:100){
-#       x_flt[,,i,] <- y[,,i,]
-#     }
-#   }, unit = 's', times = 3
+#     double = {
+#         for (i in 1:100) {
+#             x_dbl[, , i, ] <- y[, , i, ]
+#         }
+#     },
+#     float = {
+#         for (i in 1:100) {
+#             x_flt[, , i, ] <- y[, , i, ]
+#         }
+#     },
+#     unit = "s",
+#     times = 3
 # )
 # 
 # #> Unit: seconds
@@ -67,17 +71,20 @@ knitr::opts_chunk$set(
 
 ## ----eval = FALSE-------------------------------------------------------------
 # microbenchmark::microbenchmark(
-#   double = {
-#     for(i in 1:100){
-#       x_dbl[i,,,] <- y[i,,,]
-#     }
-#   },
-#   float = {
-#     for(i in 1:100){
-#       x_flt[i,,,] <- y[i,,,]
-#     }
-#   }, unit = 's', times = 3
+#     double = {
+#         for (i in 1:100) {
+#             x_dbl[i, , , ] <- y[i, , , ]
+#         }
+#     },
+#     float = {
+#         for (i in 1:100) {
+#             x_flt[i, , , ] <- y[i, , , ]
+#         }
+#     },
+#     unit = "s",
+#     times = 3
 # )
+# 
 # #> Unit: seconds
 # #>    expr   min    lq  mean median    uq   max neval
 # #>  double  3.18  3.22  3.28   3.27  3.32  3.38     3
@@ -85,18 +92,20 @@ knitr::opts_chunk$set(
 
 ## ----eval = FALSE-------------------------------------------------------------
 # microbenchmark::microbenchmark(
-#   double = {
-#     for(i in 1:10){
-#       idx <- (i-1)*10 + 1:10
-#       x_dbl[,,,idx] <- y[,,,idx]
-#     }
-#   },
-#   float = {
-#     for(i in 1:10){
-#       idx <- (i-1)*10 + 1:10
-#       x_flt[,,,idx] <- y[,,,idx]
-#     }
-#   }, unit = 's', times = 3
+#     double = {
+#         for (i in 1:10) {
+#             idx <- (i - 1) * 10 + 1:10
+#             x_dbl[, , , idx] <- y[, , , idx]
+#         }
+#     },
+#     float = {
+#         for (i in 1:10) {
+#             idx <- (i - 1) * 10 + 1:10
+#             x_flt[, , , idx] <- y[, , , idx]
+#         }
+#     },
+#     unit = "s",
+#     times = 3
 # )
 # 
 # #> Unit: seconds
@@ -106,18 +115,20 @@ knitr::opts_chunk$set(
 
 ## ----eval = FALSE-------------------------------------------------------------
 # microbenchmark::microbenchmark(
-#   double = {
-#     for(i in 1:10){
-#       idx <- (i-1)*10 + 1:10
-#       x_dbl[,,idx,] <- y[,,idx,]
-#     }
-#   },
-#   float = {
-#     for(i in 1:10){
-#       idx <- (i-1)*10 + 1:10
-#       x_flt[,,idx,] <- y[,,idx,]
-#     }
-#   }, unit = 's', times = 3
+#     double = {
+#         for (i in 1:10) {
+#             idx <- (i - 1) * 10 + 1:10
+#             x_dbl[, , idx, ] <- y[, , idx, ]
+#         }
+#     },
+#     float = {
+#         for (i in 1:10) {
+#             idx <- (i - 1) * 10 + 1:10
+#             x_flt[, , idx, ] <- y[, , idx, ]
+#         }
+#     },
+#     unit = "s",
+#     times = 3
 # )
 # 
 # #> Unit: seconds
@@ -127,19 +138,22 @@ knitr::opts_chunk$set(
 
 ## ----eval = FALSE-------------------------------------------------------------
 # microbenchmark::microbenchmark(
-#   double = {
-#     for(i in 1:10){
-#       idx <- (i-1)*10 + 1:10
-#       x_dbl[idx,,,] <- y[idx,,,]
-#     }
-#   },
-#   float = {
-#     for(i in 1:10){
-#       idx <- (i-1)*10 + 1:10
-#       x_flt[idx,,,] <- y[idx,,,]
-#     }
-#   }, unit = 's', times = 3
+#     double = {
+#         for (i in 1:10) {
+#             idx <- (i - 1) * 10 + 1:10
+#             x_dbl[idx, , , ] <- y[idx, , , ]
+#         }
+#     },
+#     float = {
+#         for (i in 1:10) {
+#             idx <- (i - 1) * 10 + 1:10
+#             x_flt[idx, , , ] <- y[idx, , , ]
+#         }
+#     },
+#     unit = "s",
+#     times = 3
 # )
+# 
 # #> Unit: seconds
 # #>    expr  min   lq mean median   uq  max neval
 # #>  double 4.48 4.48 4.64   4.48 4.72 4.95     3
@@ -147,9 +161,14 @@ knitr::opts_chunk$set(
 
 ## ----eval = FALSE-------------------------------------------------------------
 # microbenchmark::microbenchmark(
-#   double = { x_dbl[] },
-#   float = { x_flt[] },
-#   unit = 's', times = 3
+#     double = {
+#         x_dbl[]
+#     },
+#     float = {
+#         x_flt[]
+#     },
+#     unit = "s",
+#     times = 3
 # )
 # 
 # #> Unit: seconds
@@ -159,16 +178,35 @@ knitr::opts_chunk$set(
 
 ## ----eval = FALSE-------------------------------------------------------------
 # microbenchmark::microbenchmark(
-#   farr_double_partition_margin = { x_dbl[,,,1] },
-#   farr_double_fast_margin = { x_dbl[,,1,] },
-#   farr_double_slow_margin = { x_dbl[1,,,] },
-#   farr_float_partition_margin = { x_flt[,,,1] },
-#   farr_float_fast_margin = { x_flt[,,1,] },
-#   farr_float_slow_margin = { x_flt[1,,,] },
-#   native_partition_margin = { y[,,,1] },
-#   native_fast_margin = { y[,,1,] },
-#   native_slow_margin = { y[1,,,] },
-#   times = 100L, unit = "ms"
+#     farr_double_partition_margin = {
+#         x_dbl[, , , 1]
+#     },
+#     farr_double_fast_margin = {
+#         x_dbl[, , 1, ]
+#     },
+#     farr_double_slow_margin = {
+#         x_dbl[1, , , ]
+#     },
+#     farr_float_partition_margin = {
+#         x_flt[, , , 1]
+#     },
+#     farr_float_fast_margin = {
+#         x_flt[, , 1, ]
+#     },
+#     farr_float_slow_margin = {
+#         x_flt[1, , , ]
+#     },
+#     native_partition_margin = {
+#         y[, , , 1]
+#     },
+#     native_fast_margin = {
+#         y[, , 1, ]
+#     },
+#     native_slow_margin = {
+#         y[1, , , ]
+#     },
+#     times = 100L,
+#     unit = "ms"
 # )
 # 
 # #> Unit: milliseconds
@@ -191,10 +229,17 @@ knitr::opts_chunk$set(
 # idx4 <- sample(1:100, 50)
 # 
 # microbenchmark::microbenchmark(
-#   farr_double = { x_dbl[idx1, idx2, idx3, idx4] },
-#   farr_float = { x_flt[idx1, idx2, idx3, idx4] },
-#   native = { y[idx1, idx2, idx3, idx4] },
-#   times = 100L, unit = "ms"
+#     farr_double = {
+#         x_dbl[idx1, idx2, idx3, idx4]
+#     },
+#     farr_float = {
+#         x_flt[idx1, idx2, idx3, idx4]
+#     },
+#     native = {
+#         y[idx1, idx2, idx3, idx4]
+#     },
+#     times = 100L,
+#     unit = "ms"
 # )
 # 
 # #> Unit: milliseconds
@@ -208,11 +253,20 @@ knitr::opts_chunk$set(
 # output <- filearray_create(tempfile(), dim(x_dbl)[keep])
 # output$initialize_partition()
 # microbenchmark::microbenchmark(
-#   farr_double = { x_dbl$collapse(keep = keep, method = "sum") },
-#   farr_float = { x_flt$collapse(keep = keep, method = "sum") },
-#   native = { apply(y, keep, sum) },
-#   ravetools = { ravetools::collapse(y, keep, average = FALSE) },
-#   unit = "s", times = 5
+#     farr_double = {
+#         x_dbl$collapse(keep = keep, method = "sum")
+#     },
+#     farr_float = {
+#         x_flt$collapse(keep = keep, method = "sum")
+#     },
+#     native = {
+#         apply(y, keep, sum)
+#     },
+#     ravetools = {
+#         ravetools::collapse(y, keep, average = FALSE)
+#     },
+#     unit = "s",
+#     times = 5
 # )
 # 
 # #> Unit: seconds
