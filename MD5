@@ -1,11 +1,11 @@
-3514451320c118978b7865746a8d70cb *DESCRIPTION
-f9295aec8ce3e6522ef23f51b0ea4d1d *NAMESPACE
-0b4f920abad0021d16e2b251877b96ee *NEWS.md
+cf53ff7e2a6e21219a0566b133b59740 *DESCRIPTION
+baf69754e92c34528330e9320d857bf0 *NAMESPACE
+8d16339db8d2884b440bdcdac4ce3dfc *NEWS.md
 4769e84839aa4c9549154e4f65753510 *R/RcppExports.R
 18ad406cca897d32a65b388dee672ad6 *R/aaa-docs.R
 a2059d08c1b93f16b38636b887c3a4d6 *R/aaa.R
 31d8c0337cfaa5490b974fcf7441c90e *R/bind.R
-329aa2597a6516409a8a253b41ca95fb *R/class-filearray.R
+f2377f05cd0a52f1d1a8720a916572cc *R/class-filearray.R
 decff2287c5938608b65e64994763933 *R/class-proxy.R
 c6e2b8623ea889b17f3f77b2a3e1e961 *R/filearray-package.R
 828af3b3dcd9e07f431d9792a8a883c6 *R/header.R
@@ -26,7 +26,7 @@ df44eb40f9dc17145189fe553f757fa6 *R/methods-subsetAssign.R
 512dc1c1a3d2b81bd12aff58098ec644 *R/misc-docs.R
 0c9b4412efcdf3079b8bc29b55449bf4 *R/todo-list.R
 ca43aaa56f1ed1c95b655daccfa4c735 *R/write.R
-727b7fd727166f3d4f0606272ae80b49 *build/vignette.rds
+ff570ce35d58e818ba86d8db25e11a9c *build/vignette.rds
 cfc7ef6e68347998786e8f05b3abc8f5 *inst/WORDLIST
 3759ea486eda3e00af1c8ec42c42ab58 *inst/doc/performance.R
 50a9e8d944274bef52d1a9c2658d5c0b *inst/doc/performance.Rmd
