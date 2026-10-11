@@ -63,7 +63,7 @@ SEXP FARR_subset_sequential(
         const int64_t from = 0, 
         const int64_t len = 1
 ) {
-    if( TYPEOF(ret) != array_memory_sxptype(array_type) ){
+    if( (SEXPTYPE) TYPEOF(ret) != array_memory_sxptype(array_type) ){
         stop("Inconsistent `array_type` and return type");
     }
     if( len > Rf_xlength(ret) ){
@@ -243,11 +243,14 @@ SEXP FARR_subset_sequential(
             }
             
         } catch (const Rcpp::LongjumpException& e) {
-            std::rethrow_exception(std::current_exception());
+            // Use `throw;`, never `std::rethrow_exception`: a package
+            // built with libc++ can run in an R that loaded libstdc++,
+            // and `exception_ptr` would mix the two C++ runtimes
+            throw;
         } catch (const boost::interprocess::interprocess_exception& e) {
             // unable to find the file, skip
         } catch (const std::exception& e) {
-            std::rethrow_exception(std::current_exception());
+            throw;
         } catch (...) {
             throw std::runtime_error("filearray C++: Caught an unknown exception in `FARR_subset_sequential`.");
         }
@@ -339,7 +342,7 @@ struct FARRSubsetter : public TinyParallel::Worker {
     
     void operator_mmap(std::size_t begin, std::size_t end) {
         
-        for(R_xlen_t ii = begin; ii < end; ii++){
+        for(R_xlen_t ii = begin; ii < (R_xlen_t) end; ii++){
             
             int part = partitions[ii];
             int64_t skips = 0;
@@ -440,7 +443,7 @@ struct FARRSubsetter : public TinyParallel::Worker {
     
     void operator_fread(std::size_t begin, std::size_t end) {
         std::size_t ncores = buf_ptrs.size();
-        for(R_xlen_t ii = begin; ii < end; ii++){
+        for(R_xlen_t ii = begin; ii < (R_xlen_t) end; ii++){
             
             int part = partitions[ii];
             int64_t skips = 0;
